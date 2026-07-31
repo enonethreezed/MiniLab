@@ -1,0 +1,16 @@
+.vagrant/
+logs/
+
+# Splunk dev license - not for distribution
+splunk/Splunk.License
+splunk/downloads.list
+
+# AI agent tooling integration - not needed to launch/run the lab itself
+.agents/
+.beads/
+.claude/
+.codex/
+.dolt/
+*.db
+.beads-credential-key
+windows/

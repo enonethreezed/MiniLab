@@ -1,0 +1,17 @@
+title: MiniLab
+description: SOC Blue Team Vagrant lab — installation, usage, and optional feature docs
+remote_theme: just-the-docs/just-the-docs
+
+color_scheme: dark
+
+mermaid:
+  version: "10"
+
+plugins:
+  - jekyll-remote-theme
+
+nav_external_links:
+  - title: GitHub
+    url: https://github.com/enonethreezed/MiniLab
+
+footer_content: "MiniLab SOC"
