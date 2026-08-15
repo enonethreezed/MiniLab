@@ -4,7 +4,7 @@
 # for an already-created environment, with a fixed VM order.
 #
 # Usage:
-#   .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [<vagrant up args>]
+#   .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Provider hyperv|virtualbox] [<vagrant up args>]
 #   .\install.ps1 -Destroy [<vagrant destroy args>]
 #   .\install.ps1 -Start|-Stop|-Suspend|-Resume|-Reload
 #   .\install.ps1 -Status
@@ -12,8 +12,12 @@
 # Examples:
 #   .\install.ps1                              # ELK (default), no extras
 #   .\install.ps1 -Siem splunk -Guacamole      # Splunk + Guacamole
+#   .\install.ps1 -Provider hyperv             # Hyper-V instead of VirtualBox
 #   .\install.ps1 -Destroy                     # vagrant destroy -f (all VMs)
 #   .\install.ps1 -Destroy win11                # vagrant destroy -f win11 only
+#   .\install.ps1 siem                         # bring up siem only
+#   .\install.ps1 -Siem splunk siem            # siem only, with Splunk
+#   .\install.ps1 winserver                    # bring up winserver (DC) only
 #   .\install.ps1 -Stop                        # halt win11, then winserver, then siem
 #   .\install.ps1 -Start                       # up siem, then winserver, then win11
 #   .\install.ps1 -Reload                      # reload siem, then winserver, then win11
@@ -22,6 +26,8 @@
 param(
   [ValidateSet("splunk", "wazuh", "elk", "")]
   [string]$Siem = "",
+  [ValidateSet("hyperv", "virtualbox", "")]
+  [string]$Provider = "",
   [switch]$Guacamole,
   [switch]$Destroy,
   [switch]$Start,
@@ -30,19 +36,70 @@ param(
   [switch]$Resume,
   [switch]$Reload,
   [switch]$Status,
+  [Alias("h")]
+  [switch]$Help,
   [Parameter(ValueFromRemainingArguments = $true)]
   [string[]]$VagrantArgs = @()
 )
 
 $ErrorActionPreference = "Stop"
 
+function Show-Usage {
+  @'
+Usage: .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Provider hyperv|virtualbox] [<vagrant up args>]
+       .\install.ps1 -Destroy [<vagrant destroy args>]
+       .\install.ps1 -Start|-Stop|-Suspend|-Resume|-Reload|-Status
+
+  -Siem splunk|wazuh    Use Splunk or Wazuh instead of the default ELK stack
+                        (mutually exclusive with each other)
+  -Provider hyperv|virtualbox
+                        Force the Vagrant provider (default: VirtualBox).
+                        Hyper-V requires an elevated PowerShell session, the
+                        Hyper-V Windows feature enabled, and the
+                        MiniLabSwitch virtual switch created beforehand -
+                        see docs/install.html.
+  -Guacamole            Enable the Guacamole RDP/SSH gateway on siem
+  -Destroy              Run `vagrant destroy -f` instead of `vagrant up`
+                        (ignores -Siem/-Guacamole, which only matter when
+                        bringing the lab up)
+  -Start                Boot an already-created environment: siem, then
+                        winserver, then win11 (kali last, if defined)
+  -Stop                 Halt an already-created environment: win11, then
+                        winserver, then siem (kali first, if defined)
+  -Suspend              Same order as -Stop, but suspend instead of halt
+  -Resume               Same order as -Start, but resume instead of up
+  -Reload               Same order as -Start, but reload (restart +
+                        re-run provisioners) instead of up
+  -Status               Run `vagrant status`
+  -Help, -h             Show this help
+
+Anything not matching a named parameter above is passed straight through to
+`vagrant up` / `vagrant destroy`. Not applicable to -Start/-Stop/-Suspend/
+-Resume/-Reload/-Status, which always act on every VM currently defined in
+the Vagrantfile (respecting whatever ENABLE_KALI was set to when the
+environment was created).
+
+Examples:
+  .\install.ps1 siem                     # bring up siem only
+  .\install.ps1 -Siem splunk siem        # siem only, with Splunk
+  .\install.ps1 winserver                # bring up winserver (DC) only
+  .\install.ps1 -Destroy win11           # destroy win11 only
+'@
+}
+
+if ($Help) {
+  Show-Usage
+  exit 0
+}
+
 # $env: assignments persist for the whole PowerShell session, not just this
 # script - clear all three first so a previous invocation's flags in the same
 # window can't leak into this one (e.g. -Siem splunk once, then a bare
 # re-run later expecting ELK).
-Remove-Item Env:ENABLE_SPLUNK    -ErrorAction SilentlyContinue
-Remove-Item Env:ENABLE_WAZUH     -ErrorAction SilentlyContinue
-Remove-Item Env:ENABLE_GUACAMOLE -ErrorAction SilentlyContinue
+Remove-Item Env:ENABLE_SPLUNK          -ErrorAction SilentlyContinue
+Remove-Item Env:ENABLE_WAZUH           -ErrorAction SilentlyContinue
+Remove-Item Env:ENABLE_GUACAMOLE       -ErrorAction SilentlyContinue
+Remove-Item Env:VAGRANT_DEFAULT_PROVIDER -ErrorAction SilentlyContinue
 
 if ($Destroy) {
   Write-Host "Running: vagrant destroy -f $($VagrantArgs -join ' ')"
@@ -96,11 +153,13 @@ switch ($Siem) {
   "wazuh"  { $env:ENABLE_WAZUH  = "true" }
 }
 if ($Guacamole) { $env:ENABLE_GUACAMOLE = "true" }
+if ($Provider)  { $env:VAGRANT_DEFAULT_PROVIDER = $Provider }
 
 $summary = @()
 if ($env:ENABLE_SPLUNK -eq "true")    { $summary += "ENABLE_SPLUNK=true" }
 if ($env:ENABLE_WAZUH -eq "true")     { $summary += "ENABLE_WAZUH=true" }
 if ($env:ENABLE_GUACAMOLE -eq "true") { $summary += "ENABLE_GUACAMOLE=true" }
+if ($env:VAGRANT_DEFAULT_PROVIDER)    { $summary += "VAGRANT_DEFAULT_PROVIDER=$($env:VAGRANT_DEFAULT_PROVIDER)" }
 
 Write-Host "Running: $($summary -join ' ') vagrant up $($VagrantArgs -join ' ')"
 vagrant up @VagrantArgs

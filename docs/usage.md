@@ -116,6 +116,34 @@ Kibana   : http://localhost:5601
 Fleet    : http://localhost:18220
 ```
 
+{: .note }
+VirtualBox only — see [Hyper-V provider](#hyper-v-provider-windows-host) below
+if you're on `--provider=hyperv`.
+
+## Hyper-V provider (Windows host)
+
+Everything above assumes the default VirtualBox provider. `vagrant up
+--provider=hyperv` (or `VAGRANT_DEFAULT_PROVIDER=hyperv`) works the same way
+for provisioning, but **the Hyper-V provider does not support
+`forwarded_port`** — Vagrant silently ignores every `forwarded_port` stanza
+in the `Vagrantfile`. There is no `localhost:<port>` for any service; reach
+each VM directly on its private-network IP instead:
+
+| Service | VirtualBox (localhost) | Hyper-V (direct IP) |
+|---|---|---|
+| Kibana | `http://localhost:5601` | `http://192.168.56.10:5601` |
+| Elasticsearch | `http://localhost:9200` | `http://192.168.56.10:9200` |
+| Fleet | `http://localhost:18220` | `http://192.168.56.10:8220` |
+| Splunk Web | `http://localhost:8000` | `http://192.168.56.10:8000` |
+| Wazuh dashboard | `https://localhost:4430` | `https://192.168.56.10:443` |
+| Guacamole | `http://localhost:8280` | `http://192.168.56.10:8080` |
+| WinServer RDP | `localhost:13389` | `192.168.56.20:3389` |
+| Win11 RDP | `localhost:23389` | `192.168.56.30:3389` |
+
+This requires the `MiniLabSwitch` Hyper-V virtual switch to exist first
+(one-time host setup, see the comment at the top of the `Vagrantfile`) —
+without it, `vagrant up` prompts interactively for a switch on every run.
+
 ## Common commands
 
 ```bash
@@ -150,7 +178,7 @@ Domain Controller — see [Notes](#notes)).
 
 ## RDP access to Windows machines
 
-| VM | Host port | Username | Password |
+| VM | Host port (VirtualBox) | Username | Password |
 |---|---|---|---|
 | Windows Server 2022 | `localhost:13389` | vagrant | vagrant |
 | Windows 11 | `localhost:23389` | vagrant | vagrant |
@@ -158,6 +186,10 @@ Domain Controller — see [Notes](#notes)).
 ```bash
 xfreerdp /v:localhost:13389 /u:vagrant /p:vagrant /dynamic-resolution
 ```
+
+Under Hyper-V, RDP directly to the guest's private IP (`192.168.56.20:3389`
+/ `192.168.56.30:3389`) instead — see
+[Hyper-V provider](#hyper-v-provider-windows-host) above.
 
 ## Optional: Kali attacker box
 
