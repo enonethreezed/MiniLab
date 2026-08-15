@@ -76,13 +76,17 @@ $ufSvc = Get-Service -Name "SplunkForwarder" -ErrorAction SilentlyContinue
 if ($ufSvc -and $ufSvc.Status -eq "Running") { ok "SplunkForwarder service: $($ufSvc.Status)" }
 else { err "SplunkForwarder service: $($ufSvc.Status)" }
 
-# -- 4. PowerShell + Sysmon channels ------------------------------------------
+# -- 4. PowerShell + Sysmon + Defender + DNS + Transcription + Firewall --------
 # The MSI's WINEVENTLOG_*_ENABLE properties only cover Application/Security/
-# System - Microsoft-Windows-PowerShell/Operational (script block/module
-# logging events 4103/4104, enabled by win11-baseline.ps1) and
-# Microsoft-Windows-Sysmon/Operational (installed by win11-baseline.ps1, but
-# never actually reaching the SIEM without this) both need their own
-# inputs.conf stanza - MiniLab-1f7.
+# System - PowerShell/Operational (4103/4104, win11-baseline.ps1), Sysmon/
+# Operational (win11-baseline.ps1), Windows Defender/Operational
+# (win11-defender-telemetry.ps1), and DNS-Client/Operational
+# (win11-dns-telemetry.ps1 - no DNS-Server channel here, win11 isn't a DNS
+# server) all need their own inputs.conf stanza - MiniLab-1f7, MiniLab-1d0,
+# MiniLab-qju. PowerShell Transcription (win11-powershell-transcription.ps1)
+# and Windows Firewall logging (win11-firewall-logging.ps1) are both
+# file-based, not event channels, so they're monitor:// stanzas instead of
+# WinEventLog:// - MiniLab-w5t, MiniLab-nub.
 $SplunkHome = "C:\Program Files\SplunkUniversalForwarder"
 $InputsConf = "$SplunkHome\etc\system\local\inputs.conf"
 New-Item -ItemType Directory -Force -Path "$SplunkHome\etc\system\local" | Out-Null
@@ -95,9 +99,27 @@ index = main
 [WinEventLog://Microsoft-Windows-Sysmon/Operational]
 disabled = 0
 index = main
+
+[WinEventLog://Microsoft-Windows-Windows Defender/Operational]
+disabled = 0
+index = main
+
+[WinEventLog://Microsoft-Windows-DNS-Client/Operational]
+disabled = 0
+index = main
+
+[monitor://C:\PSTranscripts\*.txt]
+disabled = 0
+index = main
+sourcetype = powershell_transcript
+
+[monitor://C:\Windows\System32\LogFiles\Firewall\pfirewall.log]
+disabled = 0
+index = main
+sourcetype = ms:windows:firewall
 "@
 & "$SplunkHome\bin\splunk.exe" restart | Out-Null
-ok "PowerShell + Sysmon Operational inputs added, forwarder restarted"
+ok "PowerShell + Sysmon + Defender + DNS + Transcription + Firewall inputs added, forwarder restarted"
 
 # -- 5. Save credentials -----------------------------------------------------------
 @"

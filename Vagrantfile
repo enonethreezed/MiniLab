@@ -180,6 +180,18 @@ Vagrant.configure("2") do |config|
     ws.vm.provision "shell", name: "setup", privileged: true,
       path: "scripts/winserver-baseline.ps1"
 
+    ws.vm.provision "shell", name: "defender-telemetry", privileged: true,
+      path: "scripts/winserver-defender-telemetry.ps1"
+
+    ws.vm.provision "shell", name: "audit-policy", privileged: true,
+      path: "scripts/winserver-audit-policy.ps1"
+
+    ws.vm.provision "shell", name: "powershell-transcription", privileged: true,
+      path: "scripts/winserver-powershell-transcription.ps1"
+
+    ws.vm.provision "shell", name: "firewall-logging", privileged: true,
+      path: "scripts/winserver-firewall-logging.ps1"
+
     if ENV["ENABLE_SPLUNK"] == "true"
       ws.vm.provision "shell", name: "splunk-forwarder", privileged: true,
         path: "scripts/winserver-splunk-forwarder.ps1",
@@ -203,6 +215,12 @@ Vagrant.configure("2") do |config|
       path: "scripts/ad-domain-setup.ps1",
       args: [DOMAIN_NAME],
       reboot: true
+
+    # After ad-domain, not with the other telemetry provisioners above -
+    # needs the DNS Server role, which only exists once ad-domain-setup.ps1
+    # has promoted this box to a DC (-InstallDns:$true).
+    ws.vm.provision "shell", name: "dns-telemetry", privileged: true,
+      path: "scripts/winserver-dns-telemetry.ps1"
   end
 
   # ──────────────────────────────────────────────────────────────────────────
@@ -243,6 +261,21 @@ Vagrant.configure("2") do |config|
 
     w11.vm.provision "shell", name: "setup", privileged: true,
       path: "scripts/win11-baseline.ps1"
+
+    w11.vm.provision "shell", name: "defender-telemetry", privileged: true,
+      path: "scripts/win11-defender-telemetry.ps1"
+
+    w11.vm.provision "shell", name: "audit-policy", privileged: true,
+      path: "scripts/win11-audit-policy.ps1"
+
+    w11.vm.provision "shell", name: "powershell-transcription", privileged: true,
+      path: "scripts/win11-powershell-transcription.ps1"
+
+    w11.vm.provision "shell", name: "firewall-logging", privileged: true,
+      path: "scripts/win11-firewall-logging.ps1"
+
+    w11.vm.provision "shell", name: "dns-telemetry", privileged: true,
+      path: "scripts/win11-dns-telemetry.ps1"
 
     if ENV["ENABLE_SPLUNK"] == "true"
       w11.vm.provision "shell", name: "splunk-forwarder", privileged: true,

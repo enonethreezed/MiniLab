@@ -71,14 +71,18 @@ if ($proc.ExitCode -ne 0) {
 }
 ok "Wazuh agent installed"
 
-# -- 4. PowerShell + Sysmon channels ------------------------------------------
+# -- 4. PowerShell + Sysmon + Defender + DNS + Transcription + Firewall --------
 # The default ossec.conf (Wazuh's own upstream default) only ships localfile
-# stanzas for Application/Security/System - Microsoft-Windows-PowerShell/
-# Operational (script block/module logging events 4103/4104, enabled by
-# winserver-baseline.ps1) and Microsoft-Windows-Sysmon/Operational (installed
-# by winserver-baseline.ps1, but never actually reaching the SIEM without
-# this) both need their own stanza - MiniLab-1f7. Injected before the first
-# service start below, so no restart is needed.
+# stanzas for Application/Security/System - PowerShell/Operational (4103/
+# 4104, winserver-baseline.ps1), Sysmon/Operational (winserver-baseline.ps1),
+# Windows Defender/Operational (winserver-defender-telemetry.ps1), and both
+# DNS channels (winserver-dns-telemetry.ps1) all need their own stanza -
+# MiniLab-1f7, MiniLab-1d0, MiniLab-qju. PowerShell Transcription
+# (winserver-powershell-transcription.ps1) and Windows Firewall logging
+# (winserver-firewall-logging.ps1) are both plain-text files, not event
+# channels - log_format syslog (Wazuh's generic line-oriented text log
+# reader) instead of eventchannel - MiniLab-w5t, MiniLab-nub. Injected
+# before the first service start below, so no restart is needed.
 $OssecConf = "C:\Program Files (x86)\ossec-agent\ossec.conf"
 if (Test-Path $OssecConf) {
   $extraLocalfiles = @"
@@ -92,13 +96,38 @@ if (Test-Path $OssecConf) {
     <log_format>eventchannel</log_format>
   </localfile>
 
+  <localfile>
+    <location>Microsoft-Windows-Windows Defender/Operational</location>
+    <log_format>eventchannel</log_format>
+  </localfile>
+
+  <localfile>
+    <location>Microsoft-Windows-DNS-Server/Analytical</location>
+    <log_format>eventchannel</log_format>
+  </localfile>
+
+  <localfile>
+    <location>Microsoft-Windows-DNS-Client/Operational</location>
+    <log_format>eventchannel</log_format>
+  </localfile>
+
+  <localfile>
+    <location>C:\PSTranscripts\*.txt</location>
+    <log_format>syslog</log_format>
+  </localfile>
+
+  <localfile>
+    <location>C:\Windows\System32\LogFiles\Firewall\pfirewall.log</location>
+    <log_format>syslog</log_format>
+  </localfile>
+
 </ossec_config>
 "@
   (Get-Content $OssecConf -Raw) -replace '</ossec_config>', $extraLocalfiles |
     Set-Content -Path $OssecConf -Encoding ascii
-  ok "PowerShell + Sysmon localfile stanzas added to ossec.conf"
+  ok "PowerShell + Sysmon + Defender + DNS + Transcription + Firewall localfile stanzas added to ossec.conf"
 } else {
-  err "ossec.conf not found at $OssecConf - PowerShell/Sysmon channels not added"
+  err "ossec.conf not found at $OssecConf - PowerShell/Sysmon/Defender/DNS/Transcription/Firewall channels not added"
 }
 
 log "Starting WazuhSvc..."

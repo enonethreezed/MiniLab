@@ -244,8 +244,9 @@ Changes apply to all enrolled agents within seconds via Fleet policy push.
 ## Verifying the lab is healthy
 
 ```bash
-bash tests/check-lab.sh      # SIEM health (ELK or, with ENABLE_SPLUNK=true, delegates to check-splunk.sh) + agent enrollment
-bash tests/check-domain.sh   # minilab.local AD domain health + win11 domain membership
+bash tests/check-lab.sh         # SIEM health (ELK or, with ENABLE_SPLUNK=true, delegates to check-splunk.sh) + agent enrollment
+bash tests/check-domain.sh      # minilab.local AD domain health + win11 domain membership
+bash tests/check-telemetry.sh   # ELK only - is telemetry actually arriving, not just "is the collector up"
 ```
 
 `tests/check-lab.ps1` is the PowerShell equivalent of `check-lab.sh`, for
@@ -254,6 +255,25 @@ running the same checks from a Windows host.
 `check-domain.sh` verifies the domain using only `nmap` and native
 LDAP/Samba client tools (`ldapsearch`, `nmblookup`, `smbclient`) — see
 [Installation](install.html) to install them.
+
+`check-telemetry.sh` queries Elasticsearch directly for recent document
+counts in each data stream from the telemetry work documented in
+[`TELEMETRY.md`](https://github.com/enonethreezed/MiniLab/blob/main/TELEMETRY.md)
+(Sysmon, PowerShell, Defender, DNS, Firewall, Security) — `check-lab.sh`
+only confirms the collector/agent side is up, not that any given source is
+actually producing events.
+
+To generate that activity on demand instead of waiting for it to happen
+naturally, `scripts/generate-telemetry.ps1` (not a provisioner — run it
+manually) fires 12 benign, self-cleaning actions (logon success/failure,
+process creation, PowerShell execution, DNS query, network connection,
+file/registry/service/scheduled-task/account/group changes), each printing
+the specific event it expects:
+
+```bash
+vagrant winrm winserver -c 'C:\vagrant\scripts\generate-telemetry.ps1'
+vagrant winrm win11     -c 'C:\vagrant\scripts\generate-telemetry.ps1'
+```
 
 ## Provisioning logs
 
@@ -296,10 +316,21 @@ MiniLab/
 │   ├── splunk-provision.sh              # Splunk Enterprise on siem (ENABLE_SPLUNK=true)
 │   ├── wazuh-provision.sh               # Wazuh all-in-one on siem (ENABLE_WAZUH=true)
 │   ├── winserver-baseline.ps1           # Sysmon + Defender/Firewall on WinServer
+│   ├── winserver-audit-policy.ps1       # Category-level Security auditing on WinServer
+│   ├── winserver-defender-telemetry.ps1 # Defender/Operational channel on WinServer
+│   ├── winserver-dns-telemetry.ps1      # DNS-Server/Analytical + DNS-Client/Operational on WinServer
+│   ├── winserver-powershell-transcription.ps1 # PowerShell Transcription on WinServer
+│   ├── winserver-firewall-logging.ps1   # pfirewall.log on WinServer
 │   ├── winserver-elastic-agent.ps1      # Elastic Agent enrollment on WinServer (default)
 │   ├── winserver-splunk-forwarder.ps1   # Splunk UF on WinServer (ENABLE_SPLUNK=true)
 │   ├── winserver-wazuh-agent.ps1        # Wazuh agent on WinServer (ENABLE_WAZUH=true)
 │   ├── win11-baseline.ps1               # Sysmon + Defender/Firewall on Win11
+│   ├── win11-audit-policy.ps1           # Category-level Security auditing on Win11
+│   ├── win11-defender-telemetry.ps1     # Defender/Operational channel on Win11
+│   ├── win11-dns-telemetry.ps1          # DNS-Client/Operational on Win11
+│   ├── win11-powershell-transcription.ps1 # PowerShell Transcription on Win11
+│   ├── win11-firewall-logging.ps1       # pfirewall.log on Win11
+│   ├── generate-telemetry.ps1           # Manual, self-cleaning telemetry generator (not a provisioner)
 │   ├── win11-elastic-agent.ps1          # Elastic Agent enrollment on Win11 (default)
 │   ├── win11-splunk-forwarder.ps1       # Splunk UF on Win11 (ENABLE_SPLUNK=true)
 │   ├── win11-wazuh-agent.ps1            # Wazuh agent on Win11 (ENABLE_WAZUH=true)
@@ -313,6 +344,7 @@ MiniLab/
 ├── docs/                            # This site (GitHub Pages, served from /docs)
 └── tests/
     ├── check-lab.sh                # SIEM health check (bash) - ELK, or delegates to check-splunk.sh/check-wazuh.sh
+    ├── check-telemetry.sh          # ELK-only: is telemetry actually arriving per source, not just "collector up"
     ├── check-lab.ps1               # SIEM health check (PowerShell) - ELK only for now
     ├── check-splunk.sh             # Splunk-mode health check (ENABLE_SPLUNK=true)
     ├── check-wazuh.sh              # Wazuh-mode health check (ENABLE_WAZUH=true)
@@ -348,6 +380,11 @@ In `Vagrantfile`, change `vb.memory`. Also update the Elasticsearch heap in
 - The auto-generated `elastic` password is stored in `logs/credentials.txt` (gitignored).
 - Both baseline scripts enable PowerShell Script Block + Module logging (events 4103/4104, `Microsoft-Windows-PowerShell/Operational`) — needed to see offensive PowerShell TTPs (encoded/obfuscated/in-memory execution) beyond the literal command line Sysmon captures. ELK picks this up via the default Fleet `windows` integration; Splunk/Wazuh get an explicit `inputs.conf`/`ossec.conf` stanza from their respective agent scripts, since neither ships it by default.
 - Sysmon reaches all 3 SIEMs the same way: enabled by default for ELK (Fleet `windows` integration), explicit `inputs.conf`/`ossec.conf` stanza for Splunk/Wazuh (both were previously silently dropping it — see `TELEMETRY.md`).
+- Windows Defender Operational telemetry also reaches all 3 SIEMs (`winserver/win11-defender-telemetry.ps1` + a matching `inputs.conf`/`ossec.conf` stanza) — this one needed ELK-side work too, since the Fleet `windows` integration ships that data stream disabled by default.
+- DNS telemetry (`DNS-Server/Analytical` on `winserver` only, `DNS-Client/Operational` on both) reaches all 3 SIEMs too. ELK needed the most novel fix here: no bundled integration ships a DNS data stream at all, so `elk-provision.sh` adds two package policies from Elastic's `winlog` input package ("Custom Windows Event Logs") instead of the usual "windows" integration shortcut.
+- `winserver/win11-audit-policy.ps1` enable category-level Security auditing (Account Logon, Account Management, Detailed Tracking, DS Access, Logon/Logoff, Object Access, Policy Change, Privilege Use) plus command-line arguments on 4688 — none of this needed SIEM-side changes, it's all the Security channel.
+- PowerShell Transcription (`winserver/win11-powershell-transcription.ps1`, `C:\PSTranscripts`) is collected by all 3 SIEMs too, but as *files*, not an event channel — ELK via Elastic's `log` (Custom Logs, Deprecated but the only file-input package compatible with this lab's pinned Kibana 8.x), Splunk via `monitor://`, Wazuh via `<localfile log_format="syslog">`.
+- Windows Firewall logging (`winserver/win11-firewall-logging.ps1`, default `pfirewall.log` path, 32767 KB cap) reaches all 3 SIEMs the same file-based way as PowerShell Transcription — this was the most expensive of the telemetry fixes, since none of the 3 SIEMs have a built-in shortcut for it.
 - `winserver` is the `minilab.local` Active Directory Domain Controller. Promoting a Windows box to a DC replaces its local SAM with the domain database, so the local `vagrant` account stops being a valid login afterward — `winserver`'s Vagrant WinRM identity is `Administrator` instead (same `vagrant` password; it becomes the domain Administrator/Domain Admin automatically). `win11` keeps its own local `vagrant` account unaffected, since domain-joining a member computer doesn't touch its local SAM.
 - The DSRM (Directory Services Restore Mode) recovery password is `V4grant!2026` — separate from day-to-day credentials, only needed to boot a DC into recovery mode, just in case you broke something while playing. ;)
 

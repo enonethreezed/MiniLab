@@ -50,7 +50,7 @@ Windows endpoints ───────┼── Defender
 
 ## 1. Windows Advanced Audit Policy
 
-**Status: not implemented.** Neither baseline script runs `auditpol`; both endpoints run on Windows' out-of-the-box audit defaults.
+**Status: implemented (bd `MiniLab-e40`, GitHub #18).** `winserver/win11-audit-policy.ps1` enable success+failure auditing at the *category* level (Account Logon, Account Management, Detailed Tracking, DS Access, Logon/Logoff, Object Access, Policy Change, Privilege Use) plus the `ProcessCreationIncludeCmdLine_Enabled` registry key for command-line arguments on 4688. The 12 bullet points below collapse into those 8 categories — e.g. "Kerberos Authentication"/"Kerberos Service Ticket Operations" are both subcategories already covered by enabling "Account Logon" wholesale, same for "Directory Service Access"/"Directory Service Changes" under "DS Access". No SIEM-side change needed: it's all Security channel, already collected everywhere — on ELK specifically that's the `system` integration (`system-1`), not `windows`; Elastic's own docs are explicit that Security/Application/System channel collection was moved out of the `windows` package into `system` as of 7.11.
 
 Configure explicit Windows auditing rather than depending on the defaults of the Windows image.
 
@@ -98,15 +98,15 @@ The exact audit policy should be version-controlled so that every MiniLab instan
 
 ## 2. PowerShell Logging
 
-**Status: partially implemented.** Script Block Logging (4104) and Module Logging (4103) are enabled by `winserver-baseline.ps1`/`win11-baseline.ps1` via registry, and the Operational channel is collected by all three SIEMs (ELK gets it for free from the default Fleet `windows` integration; Splunk and Wazuh each have an explicit `inputs.conf`/`ossec.conf` stanza).
+**Status: implemented.** Script Block Logging (4104) and Module Logging (4103) are enabled by `winserver-baseline.ps1`/`win11-baseline.ps1` via registry, and the Operational channel is collected by all three SIEMs (ELK gets it for free from the default Fleet `windows` integration; Splunk and Wazuh each have an explicit `inputs.conf`/`ossec.conf` stanza).
 
-PowerShell Transcription is **not** implemented, and is not just "one more setting" alongside the other two — it's a different collection mechanism entirely. Script Block/Module Logging write to the `Microsoft-Windows-PowerShell/Operational` *event log channel*; Transcription writes plain-text `.txt` transcripts to a directory on disk (`OutputDirectory`). No agent picking up the Operational channel sees Transcription output — it needs its own file-monitoring input per SIEM (Filebeat-style file harvesting for ELK, a plain `monitor://` stanza for Splunk, a `<localfile>` with `log_format` other than `eventchannel` for Wazuh), and a decision about where that directory lives and how it's rotated.
+**PowerShell Transcription: implemented (bd `MiniLab-w5t`, GitHub #19).** Confirmed a genuinely different collection mechanism from Script Block/Module Logging, as suspected: `winserver/win11-powershell-transcription.ps1` set `OutputDirectory` to `C:\PSTranscripts` via registry, and each SIEM needed its own *file* input (not eventchannel): ELK via Elastic's `log` package (`Custom Logs`, marked Deprecated in the registry — the newer `filestream` replacement requires Kibana ^9.4.0, incompatible with this lab's pinned ELK/Kibana 8.x, so the "deprecated" one is actually the only one that works here), Splunk via a `monitor://` stanza, Wazuh via a `<localfile>` with `log_format` `syslog` (its generic line-oriented text reader) instead of `eventchannel`.
 
 Enable:
 
 - Script Block Logging — done
 - Module Logging — done
-- PowerShell Transcription — not done, different (file-based) collection path
+- PowerShell Transcription — done (file-based collection path, all 3 SIEMs)
 - PowerShell Operational event collection — done, all 3 SIEMs
 
 Important events:
@@ -173,7 +173,7 @@ The goal is not maximum event volume. The goal is useful telemetry for detection
 
 ## 4. Windows Defender Telemetry
 
-**Status: not implemented**, in any of the 3 SIEMs.
+**Status: implemented (bd `MiniLab-1d0`, GitHub #16).** `winserver/win11-defender-telemetry.ps1` confirm real-time protection is on and bump the channel's max size. Unlike PowerShell/Sysmon, ELK needed explicit work too: the Fleet `windows` integration ships the `windows_defender` data stream with `enabled: false` by default (confirmed against the package manifest) - `elk-provision.sh` now does a GET-response/modify-PUT round trip against the created package policy to flip it on. Splunk/Wazuh get the usual `inputs.conf`/`ossec.conf` stanza.
 
 Collect:
 
@@ -211,7 +211,7 @@ This teaches investigation across multiple telemetry sources rather than relying
 
 ## 5. Windows Firewall Logging
 
-**Status: not implemented** — only one inbound ICMP allow rule exists today (`Lab-ICMP-In`), no logging.
+**Status: implemented (bd `MiniLab-nub`, GitHub #20).** `winserver/win11-firewall-logging.ps1` enable `-LogAllowed`/`-LogBlocked` on all 3 profiles via `Set-NetFirewallProfile`, keeping the default `pfirewall.log` path (correct ACLs already in place) and its 32767 KB hard cap (this log format can't be bumped to 100MB like the eventchannel-based sources). Confirmed the highest SIEM-side cost of the remaining items, as expected: no built-in shortcut on any of the 3, all needed a genuine file-monitor input built from scratch - reused the same mechanism as PowerShell Transcription (ELK's `log` package, Splunk `monitor://`, Wazuh `<localfile log_format="syslog">`), since both are plain-text files.
 
 Enable Windows Firewall logging for:
 
@@ -240,7 +240,9 @@ This provides multiple perspectives on the same network behavior.
 
 ## 6. DNS Telemetry
 
-**Status: not implemented.** The premise is solid though: `winserver` is already promoted with `-InstallDns:$true` in `ad-domain-setup.ps1`, so the DC already *is* the lab's DNS server — no extra role install needed, just the logging config.
+**Status: implemented (bd `MiniLab-qju`, GitHub #17).** `winserver-dns-telemetry.ps1` enables `DNS-Server/Analytical` (an Analytic channel, off by default — `wevtutil sl ... /e:true`) and bumps `DNS-Client/Operational`'s size; `win11-dns-telemetry.ps1` just bumps the latter, since Win11 isn't a DNS server. The premise was solid: `winserver` was already promoted with `-InstallDns:$true` in `ad-domain-setup.ps1`, so the DC already *is* the lab's DNS server — no extra role install needed.
+
+This was the most novel of the telemetry fixes on the ELK side: neither the `windows` package nor any other bundled Elastic integration ships a DNS data stream at all (confirmed by inspecting every `data_stream/` folder in the actual package). `elk-provision.sh` now adds two package policies from Elastic's `winlog` *input* package ("Custom Windows Event Logs") instead, which requires an explicit channel name/dataset var rather than the "omit inputs, take the defaults" shortcut used everywhere else. Applied to the shared "Windows Endpoints" policy, so Win11 also technically subscribes to `DNS-Server/Analytical` even though it has no such channel — harmless (empty results), not clean. Splunk/Wazuh scope it correctly per-host since those configs are per-VM already.
 
 DNS should become a first-class telemetry source.
 
@@ -361,7 +363,7 @@ WEF should be optional rather than replacing the existing Elastic Agent architec
 
 ## 9. Telemetry Health Checks
 
-**Status: not implemented.**
+**Status: implemented for ELK (bd `MiniLab-czn`, GitHub #21).** `tests/check-telemetry.sh` queries Elasticsearch directly for recent document counts in every data stream wired up across this session's telemetry work (Sysmon, PowerShell Operational + Transcription, Defender, both DNS channels, Firewall, Security), rather than just checking that Fleet/Kibana/agents are up like `check-lab.sh` does. Splunk/Wazuh event-arrival checks aren't implemented — those need their own SIEM-specific query mechanism, out of scope for this one script.
 
 The existing lab health checks verify infrastructure and agent availability.
 
@@ -407,7 +409,7 @@ collector running + telemetry actually arriving
 
 ## 10. Deterministic Telemetry Generator
 
-**Status: not implemented.**
+**Status: implemented (bd `MiniLab-ahu`, GitHub #22).** `scripts/generate-telemetry.ps1` runs all 12 actions below, each self-cleaning (test user/service/task/key/file all removed after), and prints the specific event it expects per action. Not a provisioner — run it manually against an already-provisioned `winserver`/`win11`, then verify with `tests/check-telemetry.sh` on the host.
 
 Add a script capable of intentionally generating benign, deterministic events.
 
@@ -602,9 +604,9 @@ Example:
 | Windows Security | ✓ | ✓ | ✓ | Authentication |
 | Sysmon | ✓ | ✓ | ✓ | Process execution |
 | PowerShell | ✓ | ✓ | ✓ | Script execution |
-| Defender | — | — | — | Threat detection |
-| Firewall | — | — | — | Network activity |
-| DNS | — | — | — | DNS analysis |
+| Defender | ✓ | ✓ | ✓ | Threat detection |
+| Firewall | ✓ | ✓ | ✓ | Network activity |
+| DNS | ✓ | ✓ | ✓ | DNS analysis |
 | AD DS | — | ✓ | ✓ | AD attacks |
 | WEF | Optional | Optional | ✓ | Enterprise collection |
 
@@ -681,15 +683,15 @@ Retention should prevent repeated exercises from consuming excessive disk space.
 
 ### Tier 1 — Foundational telemetry
 
-1. Windows Advanced Audit Policy
-2. ~~PowerShell logging~~ — Script Block/Module Logging done; Transcription still open
+1. ~~Windows Advanced Audit Policy~~ — done (bd `MiniLab-e40` / gh-18), includes AD-specific categories
+2. ~~PowerShell logging~~ — done (Script Block/Module Logging + Transcription, bd `MiniLab-74o`/`MiniLab-w5t`)
 3. ~~Sysmon reaching Splunk and Wazuh~~ — done (bd `MiniLab-1f7` / gh-15)
-4. Defender Operational logs
-5. Windows Firewall logging
-6. DNS logging
-7. AD auditing
-8. `check-telemetry`
-9. Deterministic telemetry generator
+4. ~~Defender Operational logs~~ — done (bd `MiniLab-1d0` / gh-16)
+5. ~~Windows Firewall logging~~ — done (bd `MiniLab-nub` / gh-20)
+6. ~~DNS logging~~ — done (bd `MiniLab-qju` / gh-17)
+7. ~~AD auditing~~ — folded into item 1
+8. ~~`check-telemetry`~~ — done for ELK (bd `MiniLab-czn` / gh-21)
+9. ~~Deterministic telemetry generator~~ — done (bd `MiniLab-ahu` / gh-22)
 
 ### Tier 2 — Detection engineering
 
