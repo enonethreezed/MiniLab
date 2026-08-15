@@ -132,7 +132,7 @@ The objective is to support detection scenarios involving:
 
 ## 3. Sysmon
 
-**Status: gap confirmed, tracked.** MiniLab already installs Sysmon using the Olaf Hartong Sysmon Modular configuration on both endpoints — but as of this writing, **only ELK actually collects it** (the default Fleet `windows` integration ships a `sysmon_operational` data stream, enabled out of the box). Neither the Splunk forwarder scripts nor the Wazuh agent scripts add a Sysmon input, so in `ENABLE_SPLUNK=true`/`ENABLE_WAZUH=true` mode the telemetry this whole section describes is generated on the endpoint and then discarded. Tracked as a bug — see the repo's issue tracker (bd `MiniLab-1f7`, GitHub #15).
+**Status: fixed (bd `MiniLab-1f7`, GitHub #15).** MiniLab already installs Sysmon using the Olaf Hartong Sysmon Modular configuration on both endpoints. It reaches all 3 SIEMs now: ELK via the default Fleet `windows` integration's `sysmon_operational` data stream (enabled out of the box), Splunk via a `WinEventLog://Microsoft-Windows-Sysmon/Operational` `inputs.conf` stanza, Wazuh via a `<localfile>` eventchannel stanza in `ossec.conf` — both added by the Splunk forwarder/Wazuh agent scripts alongside the equivalent PowerShell Operational stanza.
 
 The logging roadmap should ensure that the configuration provides useful telemetry for:
 
@@ -600,7 +600,7 @@ Example:
 | Telemetry | Win11 | WinServer | SIEM | Primary use |
 |---|---:|---:|---:|---|
 | Windows Security | ✓ | ✓ | ✓ | Authentication |
-| Sysmon | ✓ | ✓ | ELK only | Process execution |
+| Sysmon | ✓ | ✓ | ✓ | Process execution |
 | PowerShell | ✓ | ✓ | ✓ | Script execution |
 | Defender | — | — | — | Threat detection |
 | Firewall | — | — | — | Network activity |
@@ -683,7 +683,7 @@ Retention should prevent repeated exercises from consuming excessive disk space.
 
 1. Windows Advanced Audit Policy
 2. ~~PowerShell logging~~ — Script Block/Module Logging done; Transcription still open
-3. Sysmon reaching Splunk and Wazuh (bd `MiniLab-1f7` / gh-15) — not on the original list, but the highest-value fix available right now: the telemetry already exists on the endpoint, it just isn't being shipped
+3. ~~Sysmon reaching Splunk and Wazuh~~ — done (bd `MiniLab-1f7` / gh-15)
 4. Defender Operational logs
 5. Windows Firewall logging
 6. DNS logging

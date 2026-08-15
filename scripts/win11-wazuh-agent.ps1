@@ -71,6 +71,36 @@ if ($proc.ExitCode -ne 0) {
 }
 ok "Wazuh agent installed"
 
+# -- 4. PowerShell + Sysmon channels ------------------------------------------
+# The default ossec.conf (Wazuh's own upstream default) only ships localfile
+# stanzas for Application/Security/System - Microsoft-Windows-PowerShell/
+# Operational (script block/module logging events 4103/4104, enabled by
+# win11-baseline.ps1) and Microsoft-Windows-Sysmon/Operational (installed by
+# win11-baseline.ps1, but never actually reaching the SIEM without this)
+# both need their own stanza - MiniLab-1f7. Injected before the first
+# service start below, so no restart is needed.
+$OssecConf = "C:\Program Files (x86)\ossec-agent\ossec.conf"
+if (Test-Path $OssecConf) {
+  $extraLocalfiles = @"
+  <localfile>
+    <location>Microsoft-Windows-PowerShell/Operational</location>
+    <log_format>eventchannel</log_format>
+  </localfile>
+
+  <localfile>
+    <location>Microsoft-Windows-Sysmon/Operational</location>
+    <log_format>eventchannel</log_format>
+  </localfile>
+
+</ossec_config>
+"@
+  (Get-Content $OssecConf -Raw) -replace '</ossec_config>', $extraLocalfiles |
+    Set-Content -Path $OssecConf -Encoding ascii
+  ok "PowerShell + Sysmon localfile stanzas added to ossec.conf"
+} else {
+  err "ossec.conf not found at $OssecConf - PowerShell/Sysmon channels not added"
+}
+
 log "Starting WazuhSvc..."
 Start-Service -Name "WazuhSvc" -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 5
@@ -78,7 +108,7 @@ $svc = Get-Service -Name "WazuhSvc" -ErrorAction SilentlyContinue
 if ($svc -and $svc.Status -eq "Running") { ok "WazuhSvc: $($svc.Status)" }
 else { err "WazuhSvc: $($svc.Status)" }
 
-# -- 4. Summary -------------------------------------------------------------------
+# -- 5. Summary -------------------------------------------------------------------
 log "=========================================================="
 log "  Win11 Wazuh agent setup COMPLETED"
 log "  Manager:   $SIEM_IP"

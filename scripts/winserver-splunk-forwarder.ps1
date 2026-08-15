@@ -76,7 +76,30 @@ $ufSvc = Get-Service -Name "SplunkForwarder" -ErrorAction SilentlyContinue
 if ($ufSvc -and $ufSvc.Status -eq "Running") { ok "SplunkForwarder service: $($ufSvc.Status)" }
 else { err "SplunkForwarder service: $($ufSvc.Status)" }
 
-# -- 4. Save credentials -----------------------------------------------------------
+# -- 4. PowerShell + Sysmon channels ------------------------------------------
+# The MSI's WINEVENTLOG_*_ENABLE properties only cover Application/Security/
+# System - Microsoft-Windows-PowerShell/Operational (script block/module
+# logging events 4103/4104, enabled by winserver-baseline.ps1) and
+# Microsoft-Windows-Sysmon/Operational (installed by winserver-baseline.ps1,
+# but never actually reaching the SIEM without this) both need their own
+# inputs.conf stanza - MiniLab-1f7.
+$SplunkHome = "C:\Program Files\SplunkUniversalForwarder"
+$InputsConf = "$SplunkHome\etc\system\local\inputs.conf"
+New-Item -ItemType Directory -Force -Path "$SplunkHome\etc\system\local" | Out-Null
+Add-Content -Path $InputsConf -Value @"
+
+[WinEventLog://Microsoft-Windows-PowerShell/Operational]
+disabled = 0
+index = main
+
+[WinEventLog://Microsoft-Windows-Sysmon/Operational]
+disabled = 0
+index = main
+"@
+& "$SplunkHome\bin\splunk.exe" restart | Out-Null
+ok "PowerShell + Sysmon Operational inputs added, forwarder restarted"
+
+# -- 5. Save credentials -----------------------------------------------------------
 @"
 # Splunk Universal Forwarder credentials - generated $(Get-Date)
 Username : admin
@@ -85,7 +108,7 @@ Indexer  : ${SIEM_IP}:9997
 "@ | Out-File -FilePath "$LogDir\winserver-splunk-uf-credentials.txt" -Encoding ascii
 ok "Credentials saved to logs/winserver-splunk-uf-credentials.txt"
 
-# -- 5. Summary ----------------------------------------------------------------
+# -- 6. Summary ----------------------------------------------------------------
 log "=========================================================="
 log "  WinServer Splunk Universal Forwarder setup COMPLETED"
 log "  Forwarding to: ${SIEM_IP}:9997"

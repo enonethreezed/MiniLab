@@ -55,15 +55,36 @@ New-NetFirewallRule -DisplayName "Lab-ICMP-In" `
   -Direction Inbound -Protocol ICMPv4 -Action Allow `
   -RemoteAddress "192.168.56.0/24" -ErrorAction SilentlyContinue | Out-Null
 
-# -- 3. Summary ----------------------------------------------------------------
+# -- 3. PowerShell Script Block + Module logging -------------------------------
+# Off by default in Windows - without this, offensive PowerShell (encoded/
+# obfuscated/in-memory execution - most real TTPs) leaves no trace beyond the
+# literal Sysmon process-creation CommandLine. Writes to the
+# Microsoft-Windows-PowerShell/Operational channel (events 4103/4104), which
+# every SIEM option in this lab can ingest from that same channel.
+$sblPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging"
+New-Item -Path $sblPath -Force | Out-Null
+Set-ItemProperty -Path $sblPath -Name "EnableScriptBlockLogging" -Value 1 -Type DWord
+
+$modPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging"
+New-Item -Path $modPath -Force | Out-Null
+Set-ItemProperty -Path $modPath -Name "EnableModuleLogging" -Value 1 -Type DWord
+New-Item -Path "$modPath\ModuleNames" -Force | Out-Null
+Set-ItemProperty -Path "$modPath\ModuleNames" -Name "*" -Value "*" -Type String
+
+# Default channel size (1MB) fills up fast under any real testing.
+wevtutil sl "Microsoft-Windows-PowerShell/Operational" /ms:104857600
+ok "PowerShell Script Block + Module logging enabled"
+
+# -- 4. Summary ----------------------------------------------------------------
 log "--- Final service status ---"
 $s = Get-Service -Name "Sysmon64" -ErrorAction SilentlyContinue
 if ($s) { log "  Sysmon64: $($s.Status)" } else { err "  Sysmon64 not found" }
 log "=========================================================="
 log "  WinServer baseline provisioning COMPLETED"
-log "  Sysmon:   Olaf Hartong config"
-log "  RDP host: localhost:13389"
-log "  Full log: logs/winserver-baseline.log"
+log "  Sysmon:      Olaf Hartong config"
+log "  PS logging:  Script Block + Module (4103/4104)"
+log "  RDP host:    localhost:13389"
+log "  Full log:    logs/winserver-baseline.log"
 log "=========================================================="
 
 Stop-Transcript
