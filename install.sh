@@ -15,6 +15,8 @@
 #   ./install.sh --siem splunk --guacamole    # Splunk + Guacamole
 #   ./install.sh --destroy                    # vagrant destroy -f (all VMs)
 #   ./install.sh --destroy -- win11           # vagrant destroy -f win11 only
+#   ./install.sh -- siem                      # bring up siem only
+#   ./install.sh --siem splunk -- siem        # siem only, with Splunk
 #   ./install.sh --stop                       # halt win11, then winserver, then siem
 #   ./install.sh --start                      # up siem, then winserver, then win11
 #   ./install.sh --reload                     # reload siem, then winserver, then win11
@@ -50,10 +52,16 @@ Usage: ./install.sh [--siem splunk|wazuh] [--guacamole] [-- <vagrant up args>]
   -h, --help            Show this help
 
 Anything after -- is passed straight through to `vagrant up` / `vagrant
-destroy` (e.g. to target only specific VMs). Not applicable to
---start/--stop/--suspend/--resume/--reload/--status, which always act on
-every VM currently defined in the Vagrantfile (respecting whatever
-ENABLE_KALI was set to when the environment was created).
+destroy`. Not applicable to --start/--stop/--suspend/--resume/--reload/
+--status, which always act on every VM currently defined in the Vagrantfile
+(respecting whatever ENABLE_KALI was set to when the environment was
+created).
+
+Examples:
+  ./install.sh -- siem                   # bring up siem only
+  ./install.sh --siem splunk -- siem     # siem only, with Splunk
+  ./install.sh -- winserver              # bring up winserver (DC) only
+  ./install.sh --destroy -- win11        # destroy win11 only
 EOF
 }
 
