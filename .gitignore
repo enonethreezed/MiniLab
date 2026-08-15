@@ -13,4 +13,9 @@ splunk/downloads.list
 .dolt/
 *.db
 .beads-credential-key
+CLAUDE.md
+# Tools and payloads dropped here 
 windows/
+
+# Beads / Dolt files (added by bd init)
+.beads/proxieddb/
