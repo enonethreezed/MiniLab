@@ -51,6 +51,10 @@ For Splunk or Wazuh instead of ELK, set `ENABLE_SPLUNK=true` or
 [Splunk](splunk.html) / [Wazuh](wazuh.html). Mutually exclusive with each
 other and with the ELK default.
 
+Add `ENABLE_VELOCIRAPTOR=true` for live triage/hunting alongside whichever
+SIEM stack you picked — not mutually exclusive with anything above, see
+[Velociraptor](velociraptor.html).
+
 ### Installer wrapper
 
 `install.sh` (Linux/macOS) and `install.ps1` (Windows) wrap `vagrant up`
@@ -137,6 +141,7 @@ each VM directly on its private-network IP instead:
 | Splunk Web | `http://localhost:8000` | `http://192.168.56.10:8000` |
 | Wazuh dashboard | `https://localhost:4430` | `https://192.168.56.10:443` |
 | Guacamole | `http://localhost:8280` | `http://192.168.56.10:8080` |
+| Velociraptor GUI | `https://localhost:8889` | `https://192.168.56.10:8889` |
 | WinServer RDP | `localhost:13389` | `192.168.56.20:3389` |
 | Win11 RDP | `localhost:23389` | `192.168.56.30:3389` |
 
@@ -301,7 +306,10 @@ MiniLab/
 │   ├── ad-domain-setup.ps1              # Promotes winserver to a minilab.local DC
 │   ├── domain-join.ps1                  # Joins win11 to minilab.local
 │   ├── docker-setup.sh                  # Docker Engine + Compose on siem (ENABLE_GUACAMOLE=true)
-│   └── guacamole-setup.sh               # Deploys guacd + Guacamole webapp on siem (ENABLE_GUACAMOLE=true)
+│   ├── guacamole-setup.sh               # Deploys guacd + Guacamole webapp on siem (ENABLE_GUACAMOLE=true)
+│   ├── velociraptor-provision.sh        # Velociraptor server on siem (ENABLE_VELOCIRAPTOR=true)
+│   ├── winserver-velociraptor-agent.ps1 # Velociraptor client on WinServer (ENABLE_VELOCIRAPTOR=true)
+│   └── win11-velociraptor-agent.ps1     # Velociraptor client on Win11 (ENABLE_VELOCIRAPTOR=true)
 ├── docs/                            # This site (GitHub Pages, served from /docs)
 └── tests/
     ├── check-lab.sh                # SIEM health check (bash) - ELK, or delegates to check-splunk.sh/check-wazuh.sh
@@ -341,4 +349,4 @@ In `Vagrantfile`, change `vb.memory`. Also update the Elasticsearch heap in
 - `winserver` is the `minilab.local` Active Directory Domain Controller. Promoting a Windows box to a DC replaces its local SAM with the domain database, so the local `vagrant` account stops being a valid login afterward — `winserver`'s Vagrant WinRM identity is `Administrator` instead (same `vagrant` password; it becomes the domain Administrator/Domain Admin automatically). `win11` keeps its own local `vagrant` account unaffected, since domain-joining a member computer doesn't touch its local SAM.
 - The DSRM (Directory Services Restore Mode) recovery password is `V4grant!2026` — separate from day-to-day credentials, only needed to boot a DC into recovery mode, just in case you broke something while playing. ;)
 
-→ [Splunk](splunk.html) · [Guacamole](guacamole.html)
+→ [Splunk](splunk.html) · [Guacamole](guacamole.html) · [Velociraptor](velociraptor.html)

@@ -5,7 +5,7 @@
 # for an already-created environment, with a fixed VM order.
 #
 # Usage:
-#   ./install.sh [--siem splunk|wazuh] [--guacamole] [-- <vagrant up args>]
+#   ./install.sh [--siem splunk|wazuh] [--guacamole] [--velociraptor] [-- <vagrant up args>]
 #   ./install.sh --destroy [-- <vagrant destroy args>]
 #   ./install.sh --start|--stop|--suspend|--resume|--reload
 #   ./install.sh --status
@@ -13,6 +13,7 @@
 # Examples:
 #   ./install.sh                              # ELK (default), no extras
 #   ./install.sh --siem splunk --guacamole    # Splunk + Guacamole
+#   ./install.sh --velociraptor               # ELK + Velociraptor hunting console
 #   ./install.sh --destroy                    # vagrant destroy -f (all VMs)
 #   ./install.sh --destroy -- win11           # vagrant destroy -f win11 only
 #   ./install.sh -- siem                      # bring up siem only
@@ -24,22 +25,26 @@ set -euo pipefail
 
 SIEM=""
 GUACAMOLE=false
+VELOCIRAPTOR=false
 DESTROY=false
 ACTION=""
 VAGRANT_ARGS=()
 
 usage() {
   cat <<'EOF'
-Usage: ./install.sh [--siem splunk|wazuh] [--guacamole] [-- <vagrant up args>]
+Usage: ./install.sh [--siem splunk|wazuh] [--guacamole] [--velociraptor] [-- <vagrant up args>]
        ./install.sh --destroy [-- <vagrant destroy args>]
        ./install.sh --start|--stop|--suspend|--resume|--reload|--status
 
   --siem splunk|wazuh   Use Splunk or Wazuh instead of the default ELK stack
                         (mutually exclusive with each other)
   --guacamole           Enable the Guacamole RDP/SSH gateway on siem
+  --velociraptor        Enable the Velociraptor hunting console on siem +
+                        clients on winserver/win11 (not mutually exclusive
+                        with --siem - additive alongside any SIEM stack)
   --destroy             Run `vagrant destroy -f` instead of `vagrant up`
-                        (ignores --siem/--guacamole, which only matter when
-                        bringing the lab up)
+                        (ignores --siem/--guacamole/--velociraptor, which
+                        only matter when bringing the lab up)
   --start               Boot an already-created environment: siem, then
                         winserver, then win11 (kali last, if defined)
   --stop                Halt an already-created environment: win11, then
@@ -80,6 +85,10 @@ while [ $# -gt 0 ]; do
       ;;
     --guacamole)
       GUACAMOLE=true
+      shift
+      ;;
+    --velociraptor)
+      VELOCIRAPTOR=true
       shift
       ;;
     --destroy|--start|--stop|--suspend|--resume|--reload|--status)
@@ -165,6 +174,7 @@ case "$SIEM" in
   elk|"") ;; # default, nothing to set
 esac
 [ "$GUACAMOLE" = true ] && ENV_ARGS+=("ENABLE_GUACAMOLE=true")
+[ "$VELOCIRAPTOR" = true ] && ENV_ARGS+=("ENABLE_VELOCIRAPTOR=true")
 
 echo "Running: env ${ENV_ARGS[*]:-} vagrant up ${VAGRANT_ARGS[*]:-}"
 env "${ENV_ARGS[@]}" vagrant up "${VAGRANT_ARGS[@]}"

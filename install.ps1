@@ -4,7 +4,7 @@
 # for an already-created environment, with a fixed VM order.
 #
 # Usage:
-#   .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Provider hyperv|virtualbox] [<vagrant up args>]
+#   .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Velociraptor] [-Provider hyperv|virtualbox] [<vagrant up args>]
 #   .\install.ps1 -Destroy [<vagrant destroy args>]
 #   .\install.ps1 -Start|-Stop|-Suspend|-Resume|-Reload
 #   .\install.ps1 -Status
@@ -12,6 +12,7 @@
 # Examples:
 #   .\install.ps1                              # ELK (default), no extras
 #   .\install.ps1 -Siem splunk -Guacamole      # Splunk + Guacamole
+#   .\install.ps1 -Velociraptor                # ELK + Velociraptor hunting console
 #   .\install.ps1 -Provider hyperv             # Hyper-V instead of VirtualBox
 #   .\install.ps1 -Destroy                     # vagrant destroy -f (all VMs)
 #   .\install.ps1 -Destroy win11                # vagrant destroy -f win11 only
@@ -29,6 +30,7 @@ param(
   [ValidateSet("hyperv", "virtualbox", "")]
   [string]$Provider = "",
   [switch]$Guacamole,
+  [switch]$Velociraptor,
   [switch]$Destroy,
   [switch]$Start,
   [switch]$Stop,
@@ -46,7 +48,7 @@ $ErrorActionPreference = "Stop"
 
 function Show-Usage {
   @'
-Usage: .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Provider hyperv|virtualbox] [<vagrant up args>]
+Usage: .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Velociraptor] [-Provider hyperv|virtualbox] [<vagrant up args>]
        .\install.ps1 -Destroy [<vagrant destroy args>]
        .\install.ps1 -Start|-Stop|-Suspend|-Resume|-Reload|-Status
 
@@ -59,9 +61,12 @@ Usage: .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Provider hyperv|virtual
                         MiniLabSwitch virtual switch created beforehand -
                         see docs/install.html.
   -Guacamole            Enable the Guacamole RDP/SSH gateway on siem
+  -Velociraptor         Enable the Velociraptor hunting console on siem +
+                        clients on winserver/win11 (not mutually exclusive
+                        with -Siem - additive alongside any SIEM stack)
   -Destroy              Run `vagrant destroy -f` instead of `vagrant up`
-                        (ignores -Siem/-Guacamole, which only matter when
-                        bringing the lab up)
+                        (ignores -Siem/-Guacamole/-Velociraptor, which only
+                        matter when bringing the lab up)
   -Start                Boot an already-created environment: siem, then
                         winserver, then win11 (kali last, if defined)
   -Stop                 Halt an already-created environment: win11, then
@@ -99,6 +104,7 @@ if ($Help) {
 Remove-Item Env:ENABLE_SPLUNK          -ErrorAction SilentlyContinue
 Remove-Item Env:ENABLE_WAZUH           -ErrorAction SilentlyContinue
 Remove-Item Env:ENABLE_GUACAMOLE       -ErrorAction SilentlyContinue
+Remove-Item Env:ENABLE_VELOCIRAPTOR    -ErrorAction SilentlyContinue
 Remove-Item Env:VAGRANT_DEFAULT_PROVIDER -ErrorAction SilentlyContinue
 
 if ($Destroy) {
@@ -152,14 +158,16 @@ switch ($Siem) {
   "splunk" { $env:ENABLE_SPLUNK = "true" }
   "wazuh"  { $env:ENABLE_WAZUH  = "true" }
 }
-if ($Guacamole) { $env:ENABLE_GUACAMOLE = "true" }
-if ($Provider)  { $env:VAGRANT_DEFAULT_PROVIDER = $Provider }
+if ($Guacamole)    { $env:ENABLE_GUACAMOLE = "true" }
+if ($Velociraptor) { $env:ENABLE_VELOCIRAPTOR = "true" }
+if ($Provider)     { $env:VAGRANT_DEFAULT_PROVIDER = $Provider }
 
 $summary = @()
-if ($env:ENABLE_SPLUNK -eq "true")    { $summary += "ENABLE_SPLUNK=true" }
-if ($env:ENABLE_WAZUH -eq "true")     { $summary += "ENABLE_WAZUH=true" }
-if ($env:ENABLE_GUACAMOLE -eq "true") { $summary += "ENABLE_GUACAMOLE=true" }
-if ($env:VAGRANT_DEFAULT_PROVIDER)    { $summary += "VAGRANT_DEFAULT_PROVIDER=$($env:VAGRANT_DEFAULT_PROVIDER)" }
+if ($env:ENABLE_SPLUNK -eq "true")       { $summary += "ENABLE_SPLUNK=true" }
+if ($env:ENABLE_WAZUH -eq "true")        { $summary += "ENABLE_WAZUH=true" }
+if ($env:ENABLE_GUACAMOLE -eq "true")    { $summary += "ENABLE_GUACAMOLE=true" }
+if ($env:ENABLE_VELOCIRAPTOR -eq "true") { $summary += "ENABLE_VELOCIRAPTOR=true" }
+if ($env:VAGRANT_DEFAULT_PROVIDER)       { $summary += "VAGRANT_DEFAULT_PROVIDER=$($env:VAGRANT_DEFAULT_PROVIDER)" }
 
 Write-Host "Running: $($summary -join ' ') vagrant up $($VagrantArgs -join ' ')"
 vagrant up @VagrantArgs

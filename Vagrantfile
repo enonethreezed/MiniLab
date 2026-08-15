@@ -61,6 +61,11 @@ Vagrant.configure("2") do |config|
     # as everything else in this lab. Keeps the host closed to inbound traffic
     # by default (no ufw exception needed for this port).
     siem.vm.network "forwarded_port", guest: 8080, host: 8280, host_ip: "127.0.0.1"
+    # Velociraptor (optional, ENABLE_VELOCIRAPTOR=true) - GUI + client-server
+    # frontend. Frontend is 8001, not Velociraptor's 8000 default, since that
+    # clashes with Splunk Web on this same VM (ENABLE_SPLUNK=1).
+    siem.vm.network "forwarded_port", guest: 8889, host: 8889, host_ip: "127.0.0.1"
+    siem.vm.network "forwarded_port", guest: 8001, host: 8001, host_ip: "127.0.0.1"
 
     siem.vm.provider "virtualbox" do |vb|
       vb.name   = "SOC-SIEM"
@@ -114,6 +119,16 @@ Vagrant.configure("2") do |config|
       siem.vm.provision "shell", name: "guacamole-setup",
         path: "scripts/guacamole-setup.sh",
         args: [WSRV_IP, WIN11_IP, DOMAIN_NAME.split(".")[0].upcase]
+    end
+
+    # Optional Velociraptor (live triage / VQL hunting console) - additive
+    # alongside whichever SIEM stack is running, not mutually exclusive with
+    # ENABLE_SPLUNK/ENABLE_WAZUH. Off by default; opt in with
+    # ENABLE_VELOCIRAPTOR=true.
+    if ENV["ENABLE_VELOCIRAPTOR"] == "true"
+      siem.vm.provision "shell", name: "velociraptor-setup",
+        path: "scripts/velociraptor-provision.sh",
+        args: [SIEM_IP]
     end
   end
 
@@ -179,6 +194,11 @@ Vagrant.configure("2") do |config|
         args: [SIEM_IP]
     end
 
+    if ENV["ENABLE_VELOCIRAPTOR"] == "true"
+      ws.vm.provision "shell", name: "velociraptor-agent", privileged: true,
+        path: "scripts/winserver-velociraptor-agent.ps1"
+    end
+
     ws.vm.provision "shell", name: "ad-domain", privileged: true,
       path: "scripts/ad-domain-setup.ps1",
       args: [DOMAIN_NAME],
@@ -236,6 +256,11 @@ Vagrant.configure("2") do |config|
       w11.vm.provision "shell", name: "elastic-agent", privileged: true,
         path: "scripts/win11-elastic-agent.ps1",
         args: [SIEM_IP]
+    end
+
+    if ENV["ENABLE_VELOCIRAPTOR"] == "true"
+      w11.vm.provision "shell", name: "velociraptor-agent", privileged: true,
+        path: "scripts/win11-velociraptor-agent.ps1"
     end
 
     w11.vm.provision "shell", name: "domain-join", privileged: true,
