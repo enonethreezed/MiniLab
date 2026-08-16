@@ -14,17 +14,6 @@ WIN11_IP     = "192.168.56.30"
 KALI_IP      = "192.168.56.100"
 DOMAIN_NAME  = "minilab.local"
 
-# Hyper-V has no automatic host-only network like VirtualBox's vboxnet0 - the
-# private_network stanzas below pin every VM's NIC to this named switch.
-# One-time host setup (elevated PowerShell), before the first
-# `vagrant up --provider=hyperv`:
-#   New-VMSwitch -SwitchName MiniLabSwitch -SwitchType Internal
-# Deliberately "Internal" (host<->guests only), not "External"/bridged: that
-# keeps the fixed 192.168.56.0/24 addressing above and matches the
-# VirtualBox side, where this lab is host-only-only, not reachable from the
-# rest of the LAN.
-HYPERV_SWITCH = "MiniLabSwitch"
-
 if ENV["ENABLE_SPLUNK"] == "true" && ENV["ENABLE_WAZUH"] == "true"
   abort "ENABLE_SPLUNK and ENABLE_WAZUH are mutually exclusive - set at " \
         "most one (leave both unset for the default, ELK)."
@@ -38,14 +27,10 @@ Vagrant.configure("2") do |config|
   #    provisioned per run.
   # ──────────────────────────────────────────────────────────────────────────
   config.vm.define "siem" do |siem|
-    # generic/debian12, not debian/bookworm64: the official box dropped its
-    # hyperv build entirely (recent releases ship libvirt only) - generic/
-    # debian12 is the same Debian 12 (bookworm) but published for
-    # virtualbox/hyperv/libvirt/vmware_desktop alike.
-    siem.vm.box      = "generic/debian12"
+    siem.vm.box      = "debian/bookworm64"
     siem.vm.hostname = "siem"
 
-    siem.vm.network "private_network", ip: SIEM_IP, hyperv__switch_name: HYPERV_SWITCH
+    siem.vm.network "private_network", ip: SIEM_IP
     # Kibana accesible desde el host en http://localhost:5601
     siem.vm.network "forwarded_port", guest: 5601, host: 5601, host_ip: "127.0.0.1"
     # Elasticsearch (opcional para consultas directas)
@@ -76,13 +61,6 @@ Vagrant.configure("2") do |config|
       vb.memory = 8192
       vb.cpus   = 2
       vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
-    end
-
-    siem.vm.provider "hyperv" do |hv|
-      hv.vmname       = "SOC-SIEM"
-      hv.memory       = 8192
-      hv.cpus         = 2
-      hv.linked_clone = true
     end
 
     if ENV["ENABLE_SPLUNK"] == "true"
@@ -139,7 +117,7 @@ Vagrant.configure("2") do |config|
     ws.vm.box      = "gusztavvargadr/windows-server-2022-standard"
     ws.vm.hostname = "WIN-SRV22"
 
-    ws.vm.network "private_network", ip: WSRV_IP, hyperv__switch_name: HYPERV_SWITCH
+    ws.vm.network "private_network", ip: WSRV_IP
     # RDP desde el host
     ws.vm.network "forwarded_port", guest: 3389, host: 13389, host_ip: "127.0.0.1"
 
@@ -165,16 +143,6 @@ Vagrant.configure("2") do |config|
       vb.gui    = false
       vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
       vb.customize ["modifyvm", :id, "--clipboard", "bidirectional"]
-    end
-
-    # No Hyper-V equivalent for the vb.customize calls above (NAT DNS
-    # passthrough, clipboard integration) - Hyper-V has its own Enhanced
-    # Session Mode for clipboard, unrelated to Vagrant provider config.
-    ws.vm.provider "hyperv" do |hv|
-      hv.vmname       = "SOC-WinServer2022"
-      hv.memory       = 6192
-      hv.cpus         = 2
-      hv.linked_clone = true
     end
 
     ws.vm.provision "shell", name: "setup", privileged: true,
@@ -230,7 +198,7 @@ Vagrant.configure("2") do |config|
     w11.vm.box      = "gusztavvargadr/windows-11"
     w11.vm.hostname = "WIN11-WS01"
 
-    w11.vm.network "private_network", ip: WIN11_IP, hyperv__switch_name: HYPERV_SWITCH
+    w11.vm.network "private_network", ip: WIN11_IP
     # RDP desde el host (puerto distinto al del servidor)
     w11.vm.network "forwarded_port", guest: 3389, host: 23389, host_ip: "127.0.0.1"
 
@@ -250,13 +218,6 @@ Vagrant.configure("2") do |config|
       vb.gui    = false
       vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
       vb.customize ["modifyvm", :id, "--clipboard", "bidirectional"]
-    end
-
-    w11.vm.provider "hyperv" do |hv|
-      hv.vmname       = "SOC-Win11-WS"
-      hv.memory       = 6192
-      hv.cpus         = 2
-      hv.linked_clone = true
     end
 
     w11.vm.provision "shell", name: "setup", privileged: true,
@@ -310,18 +271,12 @@ Vagrant.configure("2") do |config|
       kali.vm.box      = "kalilinux/rolling"
       kali.vm.hostname = "kali-atk"
 
-      kali.vm.network "private_network", ip: KALI_IP, hyperv__switch_name: HYPERV_SWITCH
+      kali.vm.network "private_network", ip: KALI_IP
 
       kali.vm.provider "virtualbox" do |vb|
         vb.name   = "SOC-Kali"
         vb.gui    = false
         vb.memory = "2048"
-      end
-
-      kali.vm.provider "hyperv" do |hv|
-        hv.vmname       = "SOC-Kali"
-        hv.memory       = 2048
-        hv.linked_clone = true
       end
     end
   end

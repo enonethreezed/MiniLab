@@ -63,32 +63,6 @@ default on Ubuntu.
   sized for Guacamole; `winserver`/`win11` use 4 GB each)
 - Disk space: ~40 GB (Windows boxes are large)
 
-## Windows host with Hyper-V
-
-Alternative to VirtualBox — `.\install.ps1 -Provider hyperv` instead of
-VirtualBox. Requirements, all one-time:
-
-- Windows 10/11 **Pro/Enterprise/Education**, or Windows Server — Hyper-V
-  isn't available on Home editions.
-- Enable the feature (requires a reboot):
-  ```powershell
-  Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All
-  ```
-- Create the lab's virtual switch (elevated PowerShell):
-  ```powershell
-  New-VMSwitch -SwitchName MiniLabSwitch -SwitchType Internal
-  ```
-  `Internal`, not `External` — keeps the lab on its fixed 192.168.56.0/24
-  addressing and closed to the rest of the LAN, matching the VirtualBox
-  side. See the comment at the top of the `Vagrantfile` for details.
-- Vagrant itself needs no extra plugin (Hyper-V support is built in), but
-  every `vagrant up` / `install.ps1` call must run from an **elevated**
-  PowerShell session, or the provider fails to create VMs.
-
-Once up, `forwarded_port` doesn't apply under Hyper-V — see
-[Hyper-V provider](usage.html#hyper-v-provider-windows-host) in Usage for
-how to reach each service by IP instead of `localhost`.
-
 ## Optional: Splunk license
 
 A Splunk Enterprise license file at `splunk/Splunk.License` (gitignored, not
