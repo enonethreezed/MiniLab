@@ -81,7 +81,10 @@ with the right env vars, so you don't have to remember the flag names:
 `--debug`/`-Debug` sets `VAGRANT_LOG=debug`, Vagrant's own verbose mode — useful
 when a provisioner fails and the `logs/*.log` file it wrote isn't enough to
 see why (e.g. it died before writing anything, or the failure is in Vagrant
-itself, not the script).
+itself, not the script). It also captures the whole session — this wrapper's
+own output plus Vagrant's — to `logs/debug.log`, overwritten fresh on every
+`--debug` run, so it's ready to paste/share after a failure without having
+to re-run and copy the terminal by hand.
 
 Both are thin wrappers — equivalent to setting the `ENABLE_*` env vars
 yourself and running `vagrant up` directly, shown throughout this page.

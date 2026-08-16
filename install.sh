@@ -48,7 +48,9 @@ Usage: ./install.sh [--siem splunk|wazuh] [--guacamole] [--velociraptor] [--debu
                         verbose internal Vagrant/provisioner output, useful
                         when a provisioner fails and the plain log isn't
                         enough. Applies to every action below, not just
-                        bringing the lab up.
+                        bringing the lab up. Also tees the whole session
+                        (this wrapper's own output + Vagrant's) to
+                        logs/debug.log, overwritten fresh each run.
   --destroy             Run `vagrant destroy -f` instead of `vagrant up`
                         (ignores --siem/--guacamole/--velociraptor, which
                         only matter when bringing the lab up)
@@ -123,7 +125,16 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-[ "$DEBUG" = true ] && export VAGRANT_LOG=debug
+if [ "$DEBUG" = true ]; then
+  export VAGRANT_LOG=debug
+  # Full session (this wrapper's own output + Vagrant's verbose output)
+  # captured to logs/debug.log, truncated fresh each run - not appended,
+  # so it always reflects only the most recent attempt. Still prints live
+  # to the terminal too (tee), this isn't a silent redirect.
+  mkdir -p logs
+  exec > >(tee logs/debug.log) 2>&1
+  echo "Debug mode: full output also being saved to logs/debug.log"
+fi
 
 # Machines actually defined right now (respects ENABLE_KALI at call time),
 # in Vagrantfile declaration order.

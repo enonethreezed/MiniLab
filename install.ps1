@@ -71,7 +71,9 @@ Usage: .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Velociraptor] [-Provide
                         enough. This is PowerShell's own built-in common
                         parameter (comes free from CmdletBinding, not
                         declared here) - applies to every action below,
-                        not just bringing the lab up.
+                        not just bringing the lab up. Also transcribes the
+                        whole session to logs\debug.log, overwritten fresh
+                        each run.
   -Destroy              Run `vagrant destroy -f` instead of `vagrant up`
                         (ignores -Siem/-Guacamole/-Velociraptor, which only
                         matter when bringing the lab up)
@@ -119,7 +121,18 @@ Remove-Item Env:VAGRANT_LOG            -ErrorAction SilentlyContinue
 # -Debug is PowerShell's own common parameter (free from CmdletBinding) -
 # declaring our own [switch]$Debug would collide with it, so it's read via
 # $PSBoundParameters instead.
-if ($PSBoundParameters.ContainsKey('Debug')) { $env:VAGRANT_LOG = "debug" }
+if ($PSBoundParameters.ContainsKey('Debug')) {
+  $env:VAGRANT_LOG = "debug"
+  # Full session (this wrapper's own output + Vagrant's verbose output)
+  # captured to logs\debug.log, overwritten fresh each run - not appended,
+  # so it always reflects only the most recent attempt. Still prints live
+  # to the console too (Start-Transcript doesn't suppress it), this isn't
+  # a silent redirect.
+  try { Stop-Transcript | Out-Null } catch {}
+  New-Item -ItemType Directory -Force -Path "logs" | Out-Null
+  Start-Transcript -Path "logs\debug.log" -Force | Out-Null
+  Write-Host "Debug mode: full output also being saved to logs\debug.log"
+}
 
 if ($Destroy) {
   Write-Host "Running: vagrant destroy -f $($VagrantArgs -join ' ')"
