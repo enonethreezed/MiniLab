@@ -96,12 +96,30 @@ ok "Config patched: frontend ${SIEM_IP}:${FRONTEND_PORT}, GUI 0.0.0.0:${GUI_PORT
 # ── 3. Package + install as a systemd service ────────────────────────────────
 log "Building and installing the server .deb package..."
 ./velociraptor debian server --config "$CONFIG_FILE"
-dpkg -i velociraptor_server_*_amd64.deb
+# `velociraptor debian server` names its output velociraptor-server-<ver>.amd64.deb
+# (hyphens - confirmed by an actual failed run: dpkg couldn't find a match on
+# the underscored velociraptor_server_*_amd64.deb glob this line used to have,
+# which follows the *convention* for .deb filenames but not what this command
+# actually produces).
+DEB_FILE=$(ls velociraptor-server-*.amd64.deb 2>/dev/null | head -1)
+if [ -z "$DEB_FILE" ]; then
+  err "No velociraptor-server-*.amd64.deb found in ${WORK_DIR} after 'velociraptor debian server' - packaging step produced nothing"
+  ls -la "$WORK_DIR"
+  exit 1
+fi
+dpkg -i "$DEB_FILE"
 ok "Velociraptor server installed as a systemd service (velociraptor_server)"
 
 # ── 4. Admin user ─────────────────────────────────────────────────────────────
+# The .deb postinst creates a dedicated 'velociraptor' service account and
+# hands it ownership of the config/datastore - confirmed by an actual failed
+# run: running the CLI as root here fails with "Velociraptor should be
+# running as the 'velociraptor' user but you are 'root'. Please change user
+# with sudo first." (the earlier config-generate/debian-server calls above
+# ran fine as root because that's before install, on the raw binary, with no
+# ownership restriction yet).
 ADMIN_PASS="Vr$(openssl rand -hex 9)9!"
-velociraptor --config "$CONFIG_FILE" user add --role=administrator admin "$ADMIN_PASS"
+sudo -u velociraptor velociraptor --config "$CONFIG_FILE" user add --role=administrator admin "$ADMIN_PASS"
 systemctl restart velociraptor_server
 ok "Admin user created, service restarted to pick it up"
 
@@ -123,7 +141,8 @@ fi
 } > "${LOG_DIR}/velociraptor-credentials.txt"
 ok "Credentials saved to logs/velociraptor-credentials.txt"
 
-velociraptor --config "$CONFIG_FILE" config client > "${LOG_DIR}/velociraptor-client.config.yaml"
+# Same post-install ownership restriction as the user add call above.
+sudo -u velociraptor velociraptor --config "$CONFIG_FILE" config client > "${LOG_DIR}/velociraptor-client.config.yaml"
 chmod 644 "${LOG_DIR}/velociraptor-client.config.yaml"
 ok "Client config saved to logs/velociraptor-client.config.yaml"
 
