@@ -5,7 +5,7 @@
 # for an already-created environment, with a fixed VM order.
 #
 # Usage:
-#   ./install.sh [--siem splunk|wazuh] [--guacamole] [--velociraptor] [--debug] [-- <vagrant up args>]
+#   ./install.sh [--siem splunk|wazuh] [--guacamole] [--velociraptor] [--kali-minimal] [--debug] [-- <vagrant up args>]
 #   ./install.sh --destroy [-- <vagrant destroy args>]
 #   ./install.sh --start|--stop|--suspend|--resume|--reload
 #   ./install.sh --status
@@ -14,6 +14,7 @@
 #   ./install.sh                              # ELK (default), no extras
 #   ./install.sh --siem splunk --guacamole    # Splunk + Guacamole
 #   ./install.sh --velociraptor               # ELK + Velociraptor hunting console
+#   ./install.sh --kali-minimal -- kali       # stripped-down Kali attacker box only
 #   ./install.sh --debug                      # verbose Vagrant/provisioner output (VAGRANT_LOG=debug)
 #   ./install.sh --destroy                    # vagrant destroy -f (all VMs)
 #   ./install.sh --destroy -- win11           # vagrant destroy -f win11 only
@@ -27,6 +28,7 @@ set -euo pipefail
 SIEM=""
 GUACAMOLE=false
 VELOCIRAPTOR=false
+KALI_MINIMAL=false
 DEBUG=false
 DESTROY=false
 ACTION=""
@@ -34,7 +36,7 @@ VAGRANT_ARGS=()
 
 usage() {
   cat <<'EOF'
-Usage: ./install.sh [--siem splunk|wazuh] [--guacamole] [--velociraptor] [--debug] [-- <vagrant up args>]
+Usage: ./install.sh [--siem splunk|wazuh] [--guacamole] [--velociraptor] [--kali-minimal] [--debug] [-- <vagrant up args>]
        ./install.sh --destroy [-- <vagrant destroy args>]
        ./install.sh --start|--stop|--suspend|--resume|--reload|--status
 
@@ -44,6 +46,12 @@ Usage: ./install.sh [--siem splunk|wazuh] [--guacamole] [--velociraptor] [--debu
   --velociraptor        Enable the Velociraptor hunting console on siem +
                         clients on winserver/win11 (not mutually exclusive
                         with --siem - additive alongside any SIEM stack)
+  --kali-minimal        Bring up the Kali attacker box (implies ENABLE_KALI),
+                        stripped to kali-linux-core after boot - the box
+                        download is still the full kalilinux/rolling image
+                        (no smaller official box exists), but the desktop
+                        environment and default tool metapackage are purged
+                        since this VM runs headless
   --debug               Export VAGRANT_LOG=debug before running vagrant -
                         verbose internal Vagrant/provisioner output, useful
                         when a provisioner fails and the plain log isn't
@@ -98,6 +106,10 @@ while [ $# -gt 0 ]; do
       ;;
     --velociraptor)
       VELOCIRAPTOR=true
+      shift
+      ;;
+    --kali-minimal)
+      KALI_MINIMAL=true
       shift
       ;;
     --debug)
@@ -199,6 +211,7 @@ case "$SIEM" in
 esac
 [ "$GUACAMOLE" = true ] && ENV_ARGS+=("ENABLE_GUACAMOLE=true")
 [ "$VELOCIRAPTOR" = true ] && ENV_ARGS+=("ENABLE_VELOCIRAPTOR=true")
+[ "$KALI_MINIMAL" = true ] && ENV_ARGS+=("ENABLE_KALI=true" "ENABLE_KALI_MINIMAL=true")
 
 echo "Running: env ${ENV_ARGS[*]:-} vagrant up ${VAGRANT_ARGS[*]:-}"
 env "${ENV_ARGS[@]}" vagrant up "${VAGRANT_ARGS[@]}"

@@ -278,6 +278,17 @@ Vagrant.configure("2") do |config|
         vb.gui    = false
         vb.memory = "2048"
       end
+
+      # Optional minimal strip-down (ENABLE_KALI_MINIMAL=true) - kalilinux/
+      # rolling is still the same ~10GB desktop box download (no smaller
+      # official Kali box exists), but this purges the desktop environment
+      # and the kali-linux-default tool metapackage down to kali-linux-core
+      # right after boot, since this VM runs headless and doesn't need
+      # either.
+      if ENV["ENABLE_KALI_MINIMAL"] == "true"
+        kali.vm.provision "shell", name: "kali-minimal",
+          path: "scripts/kali-minimal-provision.sh"
+      end
     end
   end
 

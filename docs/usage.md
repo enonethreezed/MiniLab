@@ -175,14 +175,34 @@ xfreerdp /v:localhost:13389 /u:vagrant /p:vagrant /dynamic-resolution
 
 ## Optional: Kali attacker box
 
-A minimal Kali Linux VM (`kalilinux/rolling`, 192.168.56.100, 2 GB RAM,
-headless) for driving traffic/attacks against `winserver`/`win11` to
-generate detections. Off by default — no provisioning script runs on it
-(bring your own tooling); it just joins the lab's private network.
+A Kali Linux VM (`kalilinux/rolling`, 192.168.56.100, 2 GB RAM, headless) for
+driving traffic/attacks against `winserver`/`win11` to generate detections.
+Off by default — no provisioning script runs on it by default (bring your
+own tooling); it just joins the lab's private network.
 
 ```bash
 ENABLE_KALI=true vagrant up kali
+./install.sh -- kali                 # same thing, via the wrapper
 ```
+
+### Minimal variant
+
+`kalilinux/rolling` is a full desktop image (~10 GB after first boot) — no
+smaller official Kali box exists. `--kali-minimal`/`-KaliMinimal` still
+downloads that same box, but purges the desktop environment and the
+`kali-linux-default` tool metapackage right after boot (`scripts/kali-minimal-provision.sh`),
+leaving only `kali-linux-core` — useful when you don't need the full
+toolset and just want a lighter-footprint attacker box:
+
+```bash
+./install.sh --kali-minimal -- kali
+```
+
+```powershell
+.\install.ps1 -KaliMinimal kali
+```
+
+Equivalent to `ENABLE_KALI=true ENABLE_KALI_MINIMAL=true vagrant up kali`.
 
 Access:
 
@@ -317,7 +337,8 @@ MiniLab/
 │   ├── guacamole-setup.sh               # Deploys guacd + Guacamole webapp on siem (ENABLE_GUACAMOLE=true)
 │   ├── velociraptor-provision.sh        # Velociraptor server on siem (ENABLE_VELOCIRAPTOR=true)
 │   ├── winserver-velociraptor-agent.ps1 # Velociraptor client on WinServer (ENABLE_VELOCIRAPTOR=true)
-│   └── win11-velociraptor-agent.ps1     # Velociraptor client on Win11 (ENABLE_VELOCIRAPTOR=true)
+│   ├── win11-velociraptor-agent.ps1     # Velociraptor client on Win11 (ENABLE_VELOCIRAPTOR=true)
+│   └── kali-minimal-provision.sh        # Strips Kali to kali-linux-core (ENABLE_KALI_MINIMAL=true)
 ├── docs/                            # This site (GitHub Pages, served from /docs)
 └── tests/
     ├── check-lab.sh                # SIEM health check (bash) - ELK, or delegates to check-splunk.sh/check-wazuh.sh
