@@ -410,30 +410,46 @@ else
     "http://localhost:5601/api/fleet/epm/packages/log" -H "kbn-xsrf: true" 2>/dev/null \
     | python3 -c "import sys,json; print(json.load(sys.stdin)['item']['version'])" 2>/dev/null || true)
 
+  # POST/PUT helper for Fleet API calls (MiniLab-cgx) - curl -f discards the
+  # response body on 4xx/5xx, which is exactly the useful part for diagnosing
+  # a failure. Captures HTTP status + body in $FLEET_REQUEST_BODY so a
+  # failing call logs the real reason instead of just "manual config
+  # needed", without having to repeat this boilerplate at every call site.
+  fleet_request() {
+    local method="$1" url="$2" body="$3"
+    local resp http_code
+    resp=$(curl -s -w '\n%{http_code}' -X "$method" "$url" \
+      -H "kbn-xsrf: true" -H "Content-Type: application/json" \
+      -u "elastic:${ELASTIC_PASS}" -d "$body" 2>&1)
+    http_code=$(echo "$resp" | tail -n1)
+    FLEET_REQUEST_BODY=$(echo "$resp" | sed '$d')
+    [[ "$http_code" =~ ^2[0-9][0-9]$ ]]
+  }
+
   # Add System integration. Deliberately omit "inputs" - Kibana then derives
   # the full default input/stream config from the package manifest (metrics
   # AND logs streams enabled per their defaults). Passing "inputs":[]
   # explicitly disables every stream instead of using defaults - it silently
   # produced zero logs-* data and metrics-* limited to Fleet's own internal
   # agent-status telemetry (see MiniLab-w30).
-  curl -sf -X POST "http://localhost:5601/api/fleet/package_policies" \
-    -H "kbn-xsrf: true" -H "Content-Type: application/json" \
-    -u "elastic:${ELASTIC_PASS}" \
-    -d "{\"name\":\"system-1\",\"policy_id\":\"${POLICY_ID}\",
-         \"package\":{\"name\":\"system\",\"version\":\"${SYSTEM_PKG_VER}\"},
-         \"namespace\":\"default\"}" > /dev/null 2>&1 \
-    && ok "System integration added" || log "System integration: manual config needed"
+  if fleet_request POST "http://localhost:5601/api/fleet/package_policies" \
+    "{\"name\":\"system-1\",\"policy_id\":\"${POLICY_ID}\",
+      \"package\":{\"name\":\"system\",\"version\":\"${SYSTEM_PKG_VER}\"},
+      \"namespace\":\"default\"}"
+  then
+    ok "System integration added"
+  else
+    log "System integration: manual config needed ($(echo "$FLEET_REQUEST_BODY" | tr -d '\n' | cut -c1-300))"
+  fi
 
   # Add Windows integration (event logs, Sysmon, PowerShell, etc.) - same
   # reasoning: omit "inputs" so Kibana fills in the package defaults.
-  WINDOWS_PP_RESP=$(curl -sf -X POST "http://localhost:5601/api/fleet/package_policies" \
-    -H "kbn-xsrf: true" -H "Content-Type: application/json" \
-    -u "elastic:${ELASTIC_PASS}" \
-    -d "{\"name\":\"windows-1\",\"policy_id\":\"${POLICY_ID}\",
-         \"package\":{\"name\":\"windows\",\"version\":\"${WINDOWS_PKG_VER}\"},
-         \"namespace\":\"default\"}" 2>/dev/null || true)
-
-  if [ -n "$WINDOWS_PP_RESP" ]; then
+  if fleet_request POST "http://localhost:5601/api/fleet/package_policies" \
+    "{\"name\":\"windows-1\",\"policy_id\":\"${POLICY_ID}\",
+      \"package\":{\"name\":\"windows\",\"version\":\"${WINDOWS_PKG_VER}\"},
+      \"namespace\":\"default\"}"
+  then
+    WINDOWS_PP_RESP="$FLEET_REQUEST_BODY"
     ok "Windows integration added"
 
     # windows_defender ships with the package's own default "enabled: false"
@@ -461,16 +477,15 @@ for k in ('id', 'revision', 'created_at', 'created_by', 'updated_at',
 print(json.dumps(item))
 " 2>/dev/null || true)
       if [ -n "$UPDATED_PP" ]; then
-        curl -sf -X PUT "http://localhost:5601/api/fleet/package_policies/${WINDOWS_PP_ID}" \
-          -H "kbn-xsrf: true" -H "Content-Type: application/json" \
-          -u "elastic:${ELASTIC_PASS}" \
-          -d "$UPDATED_PP" > /dev/null 2>&1 \
-          && ok "Windows Defender Operational stream enabled" \
-          || log "Windows Defender stream: manual enable needed (Fleet -> Windows Endpoints -> windows-1 -> Windows Defender)"
+        if fleet_request PUT "http://localhost:5601/api/fleet/package_policies/${WINDOWS_PP_ID}" "$UPDATED_PP"; then
+          ok "Windows Defender Operational stream enabled"
+        else
+          log "Windows Defender stream: manual enable needed (Fleet -> Windows Endpoints -> windows-1 -> Windows Defender) ($(echo "$FLEET_REQUEST_BODY" | tr -d '\n' | cut -c1-300))"
+        fi
       fi
     fi
   else
-    log "Windows integration: manual config needed"
+    log "Windows integration: manual config needed ($(echo "$FLEET_REQUEST_BODY" | tr -d '\n' | cut -c1-300))"
   fi
 
   # DNS channels (MiniLab-qju) - neither the "windows" package nor any other
@@ -487,31 +502,35 @@ print(json.dumps(item))
   # there and produces no events for it, harmless but not clean.
   add_winlog_channel() {
     # $1 = package_policy name, $2 = channel, $3 = dataset
-    curl -sf -X POST "http://localhost:5601/api/fleet/package_policies" \
-      -H "kbn-xsrf: true" -H "Content-Type: application/json" \
-      -u "elastic:${ELASTIC_PASS}" \
-      -d "{\"name\":\"$1\",\"policy_id\":\"${POLICY_ID}\",
-           \"package\":{\"name\":\"winlog\",\"version\":\"${WINLOG_PKG_VER}\"},
-           \"namespace\":\"default\",
-           \"inputs\":[{\"type\":\"winlog\",\"policy_template\":\"winlogs\",\"enabled\":true,
-             \"streams\":[{\"enabled\":true,
-               \"data_stream\":{\"type\":\"logs\",\"dataset\":\"$3\"},
-               \"vars\":{
-                 \"channel\":{\"type\":\"text\",\"value\":\"$2\"},
-                 \"data_stream.dataset\":{\"type\":\"text\",\"value\":\"$3\"}
-               }}]}]}" > /dev/null 2>&1
+    fleet_request POST "http://localhost:5601/api/fleet/package_policies" \
+      "{\"name\":\"$1\",\"policy_id\":\"${POLICY_ID}\",
+        \"package\":{\"name\":\"winlog\",\"version\":\"${WINLOG_PKG_VER}\"},
+        \"namespace\":\"default\",
+        \"inputs\":[{\"type\":\"winlog\",\"policy_template\":\"winlogs\",\"enabled\":true,
+          \"streams\":[{\"enabled\":true,
+            \"data_stream\":{\"type\":\"logs\",\"dataset\":\"$3\"},
+            \"vars\":{
+              \"channel\":{\"type\":\"text\",\"value\":\"$2\"},
+              \"data_stream.dataset\":{\"type\":\"text\",\"value\":\"$3\"}
+            }}]}]}"
   }
 
   if [ -n "$WINLOG_PKG_VER" ]; then
-    add_winlog_channel "dns-server-analytical-1" \
-      "Microsoft-Windows-DNS-Server/Analytical" "winlog.dns_server_analytical" \
-      && ok "DNS-Server/Analytical winlog input added" \
-      || log "DNS-Server/Analytical: manual config needed (Fleet -> Windows Endpoints -> Add integration -> Custom Windows Event Logs)"
+    if add_winlog_channel "dns-server-analytical-1" \
+      "Microsoft-Windows-DNS-Server/Analytical" "winlog.dns_server_analytical"
+    then
+      ok "DNS-Server/Analytical winlog input added"
+    else
+      log "DNS-Server/Analytical: manual config needed (Fleet -> Windows Endpoints -> Add integration -> Custom Windows Event Logs) ($(echo "$FLEET_REQUEST_BODY" | tr -d '\n' | cut -c1-300))"
+    fi
 
-    add_winlog_channel "dns-client-operational-1" \
-      "Microsoft-Windows-DNS-Client/Operational" "winlog.dns_client_operational" \
-      && ok "DNS-Client/Operational winlog input added" \
-      || log "DNS-Client/Operational: manual config needed (Fleet -> Windows Endpoints -> Add integration -> Custom Windows Event Logs)"
+    if add_winlog_channel "dns-client-operational-1" \
+      "Microsoft-Windows-DNS-Client/Operational" "winlog.dns_client_operational"
+    then
+      ok "DNS-Client/Operational winlog input added"
+    else
+      log "DNS-Client/Operational: manual config needed (Fleet -> Windows Endpoints -> Add integration -> Custom Windows Event Logs) ($(echo "$FLEET_REQUEST_BODY" | tr -d '\n' | cut -c1-300))"
+    fi
   else
     log "winlog package version lookup failed - DNS channels need manual config"
   fi
@@ -522,21 +541,22 @@ print(json.dumps(item))
   # forward slashes since Filebeat/Elastic Agent accept them on Windows too
   # and it avoids JSON backslash-escaping headaches in this script.
   if [ -n "$LOG_PKG_VER" ]; then
-    curl -sf -X POST "http://localhost:5601/api/fleet/package_policies" \
-      -H "kbn-xsrf: true" -H "Content-Type: application/json" \
-      -u "elastic:${ELASTIC_PASS}" \
-      -d "{\"name\":\"powershell-transcripts-1\",\"policy_id\":\"${POLICY_ID}\",
-           \"package\":{\"name\":\"log\",\"version\":\"${LOG_PKG_VER}\"},
-           \"namespace\":\"default\",
-           \"inputs\":[{\"type\":\"logfile\",\"policy_template\":\"logs\",\"enabled\":true,
-             \"streams\":[{\"enabled\":true,
-               \"data_stream\":{\"type\":\"logs\",\"dataset\":\"powershell.transcripts\"},
-               \"vars\":{
-                 \"paths\":{\"type\":\"text\",\"value\":[\"C:/PSTranscripts/*.txt\"]},
-                 \"data_stream.dataset\":{\"type\":\"text\",\"value\":\"powershell.transcripts\"}
-               }}]}]}" > /dev/null 2>&1 \
-      && ok "PowerShell Transcription file input added" \
-      || log "PowerShell Transcription: manual config needed (Fleet -> Windows Endpoints -> Add integration -> Custom Logs (Deprecated))"
+    if fleet_request POST "http://localhost:5601/api/fleet/package_policies" \
+      "{\"name\":\"powershell-transcripts-1\",\"policy_id\":\"${POLICY_ID}\",
+        \"package\":{\"name\":\"log\",\"version\":\"${LOG_PKG_VER}\"},
+        \"namespace\":\"default\",
+        \"inputs\":[{\"type\":\"logfile\",\"policy_template\":\"logs\",\"enabled\":true,
+          \"streams\":[{\"enabled\":true,
+            \"data_stream\":{\"type\":\"logs\",\"dataset\":\"powershell.transcripts\"},
+            \"vars\":{
+              \"paths\":{\"type\":\"text\",\"value\":[\"C:/PSTranscripts/*.txt\"]},
+              \"data_stream.dataset\":{\"type\":\"text\",\"value\":\"powershell.transcripts\"}
+            }}]}]}"
+    then
+      ok "PowerShell Transcription file input added"
+    else
+      log "PowerShell Transcription: manual config needed (Fleet -> Windows Endpoints -> Add integration -> Custom Logs (Deprecated)) ($(echo "$FLEET_REQUEST_BODY" | tr -d '\n' | cut -c1-300))"
+    fi
   else
     log "log package version lookup failed - PowerShell Transcription needs manual config"
   fi
@@ -545,21 +565,22 @@ print(json.dumps(item))
   # Transcription above, another plain-text file (pfirewall.log, W3C
   # extended log format), not an event channel.
   if [ -n "$LOG_PKG_VER" ]; then
-    curl -sf -X POST "http://localhost:5601/api/fleet/package_policies" \
-      -H "kbn-xsrf: true" -H "Content-Type: application/json" \
-      -u "elastic:${ELASTIC_PASS}" \
-      -d "{\"name\":\"firewall-log-1\",\"policy_id\":\"${POLICY_ID}\",
-           \"package\":{\"name\":\"log\",\"version\":\"${LOG_PKG_VER}\"},
-           \"namespace\":\"default\",
-           \"inputs\":[{\"type\":\"logfile\",\"policy_template\":\"logs\",\"enabled\":true,
-             \"streams\":[{\"enabled\":true,
-               \"data_stream\":{\"type\":\"logs\",\"dataset\":\"windows.firewall_log\"},
-               \"vars\":{
-                 \"paths\":{\"type\":\"text\",\"value\":[\"C:/Windows/System32/LogFiles/Firewall/pfirewall.log\"]},
-                 \"data_stream.dataset\":{\"type\":\"text\",\"value\":\"windows.firewall_log\"}
-               }}]}]}" > /dev/null 2>&1 \
-      && ok "Windows Firewall log file input added" \
-      || log "Windows Firewall log: manual config needed (Fleet -> Windows Endpoints -> Add integration -> Custom Logs (Deprecated))"
+    if fleet_request POST "http://localhost:5601/api/fleet/package_policies" \
+      "{\"name\":\"firewall-log-1\",\"policy_id\":\"${POLICY_ID}\",
+        \"package\":{\"name\":\"log\",\"version\":\"${LOG_PKG_VER}\"},
+        \"namespace\":\"default\",
+        \"inputs\":[{\"type\":\"logfile\",\"policy_template\":\"logs\",\"enabled\":true,
+          \"streams\":[{\"enabled\":true,
+            \"data_stream\":{\"type\":\"logs\",\"dataset\":\"windows.firewall_log\"},
+            \"vars\":{
+              \"paths\":{\"type\":\"text\",\"value\":[\"C:/Windows/System32/LogFiles/Firewall/pfirewall.log\"]},
+              \"data_stream.dataset\":{\"type\":\"text\",\"value\":\"windows.firewall_log\"}
+            }}]}]}"
+    then
+      ok "Windows Firewall log file input added"
+    else
+      log "Windows Firewall log: manual config needed (Fleet -> Windows Endpoints -> Add integration -> Custom Logs (Deprecated)) ($(echo "$FLEET_REQUEST_BODY" | tr -d '\n' | cut -c1-300))"
+    fi
   else
     log "log package version lookup failed - Windows Firewall log needs manual config"
   fi

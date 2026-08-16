@@ -64,6 +64,7 @@ with the right env vars, so you don't have to remember the flag names:
 ./install.sh                              # ELK (default), no extras
 ./install.sh --siem splunk --guacamole    # Splunk + Guacamole
 ./install.sh --siem wazuh                 # Wazuh
+./install.sh --debug                      # verbose Vagrant/provisioner output when something fails
 ./install.sh --destroy                    # vagrant destroy -f (all VMs)
 ./install.sh --destroy -- win11           # vagrant destroy -f win11 only
 ```
@@ -72,9 +73,15 @@ with the right env vars, so you don't have to remember the flag names:
 .\install.ps1                              # ELK (default), no extras
 .\install.ps1 -Siem splunk -Guacamole      # Splunk + Guacamole
 .\install.ps1 -Siem wazuh                  # Wazuh
+.\install.ps1 -Debug                       # verbose Vagrant/provisioner output when something fails
 .\install.ps1 -Destroy                     # vagrant destroy -f (all VMs)
 .\install.ps1 -Destroy win11                # vagrant destroy -f win11 only
 ```
+
+`--debug`/`-Debug` sets `VAGRANT_LOG=debug`, Vagrant's own verbose mode — useful
+when a provisioner fails and the `logs/*.log` file it wrote isn't enough to
+see why (e.g. it died before writing anything, or the failure is in Vagrant
+itself, not the script).
 
 Both are thin wrappers — equivalent to setting the `ENABLE_*` env vars
 yourself and running `vagrant up` directly, shown throughout this page.

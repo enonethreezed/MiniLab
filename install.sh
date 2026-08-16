@@ -5,7 +5,7 @@
 # for an already-created environment, with a fixed VM order.
 #
 # Usage:
-#   ./install.sh [--siem splunk|wazuh] [--guacamole] [--velociraptor] [-- <vagrant up args>]
+#   ./install.sh [--siem splunk|wazuh] [--guacamole] [--velociraptor] [--debug] [-- <vagrant up args>]
 #   ./install.sh --destroy [-- <vagrant destroy args>]
 #   ./install.sh --start|--stop|--suspend|--resume|--reload
 #   ./install.sh --status
@@ -14,6 +14,7 @@
 #   ./install.sh                              # ELK (default), no extras
 #   ./install.sh --siem splunk --guacamole    # Splunk + Guacamole
 #   ./install.sh --velociraptor               # ELK + Velociraptor hunting console
+#   ./install.sh --debug                      # verbose Vagrant/provisioner output (VAGRANT_LOG=debug)
 #   ./install.sh --destroy                    # vagrant destroy -f (all VMs)
 #   ./install.sh --destroy -- win11           # vagrant destroy -f win11 only
 #   ./install.sh -- siem                      # bring up siem only
@@ -26,13 +27,14 @@ set -euo pipefail
 SIEM=""
 GUACAMOLE=false
 VELOCIRAPTOR=false
+DEBUG=false
 DESTROY=false
 ACTION=""
 VAGRANT_ARGS=()
 
 usage() {
   cat <<'EOF'
-Usage: ./install.sh [--siem splunk|wazuh] [--guacamole] [--velociraptor] [-- <vagrant up args>]
+Usage: ./install.sh [--siem splunk|wazuh] [--guacamole] [--velociraptor] [--debug] [-- <vagrant up args>]
        ./install.sh --destroy [-- <vagrant destroy args>]
        ./install.sh --start|--stop|--suspend|--resume|--reload|--status
 
@@ -42,6 +44,11 @@ Usage: ./install.sh [--siem splunk|wazuh] [--guacamole] [--velociraptor] [-- <va
   --velociraptor        Enable the Velociraptor hunting console on siem +
                         clients on winserver/win11 (not mutually exclusive
                         with --siem - additive alongside any SIEM stack)
+  --debug               Export VAGRANT_LOG=debug before running vagrant -
+                        verbose internal Vagrant/provisioner output, useful
+                        when a provisioner fails and the plain log isn't
+                        enough. Applies to every action below, not just
+                        bringing the lab up.
   --destroy             Run `vagrant destroy -f` instead of `vagrant up`
                         (ignores --siem/--guacamole/--velociraptor, which
                         only matter when bringing the lab up)
@@ -91,6 +98,10 @@ while [ $# -gt 0 ]; do
       VELOCIRAPTOR=true
       shift
       ;;
+    --debug)
+      DEBUG=true
+      shift
+      ;;
     --destroy|--start|--stop|--suspend|--resume|--reload|--status)
       ACTION="${1#--}"
       shift
@@ -111,6 +122,8 @@ while [ $# -gt 0 ]; do
       ;;
   esac
 done
+
+[ "$DEBUG" = true ] && export VAGRANT_LOG=debug
 
 # Machines actually defined right now (respects ENABLE_KALI at call time),
 # in Vagrantfile declaration order.

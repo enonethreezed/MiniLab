@@ -4,7 +4,7 @@
 # for an already-created environment, with a fixed VM order.
 #
 # Usage:
-#   .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Velociraptor] [-Provider hyperv|virtualbox] [<vagrant up args>]
+#   .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Velociraptor] [-Provider hyperv|virtualbox] [-Debug] [<vagrant up args>]
 #   .\install.ps1 -Destroy [<vagrant destroy args>]
 #   .\install.ps1 -Start|-Stop|-Suspend|-Resume|-Reload
 #   .\install.ps1 -Status
@@ -14,6 +14,7 @@
 #   .\install.ps1 -Siem splunk -Guacamole      # Splunk + Guacamole
 #   .\install.ps1 -Velociraptor                # ELK + Velociraptor hunting console
 #   .\install.ps1 -Provider hyperv             # Hyper-V instead of VirtualBox
+#   .\install.ps1 -Debug                       # verbose Vagrant/provisioner output (VAGRANT_LOG=debug)
 #   .\install.ps1 -Destroy                     # vagrant destroy -f (all VMs)
 #   .\install.ps1 -Destroy win11                # vagrant destroy -f win11 only
 #   .\install.ps1 siem                         # bring up siem only
@@ -48,7 +49,7 @@ $ErrorActionPreference = "Stop"
 
 function Show-Usage {
   @'
-Usage: .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Velociraptor] [-Provider hyperv|virtualbox] [<vagrant up args>]
+Usage: .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Velociraptor] [-Provider hyperv|virtualbox] [-Debug] [<vagrant up args>]
        .\install.ps1 -Destroy [<vagrant destroy args>]
        .\install.ps1 -Start|-Stop|-Suspend|-Resume|-Reload|-Status
 
@@ -64,6 +65,13 @@ Usage: .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Velociraptor] [-Provide
   -Velociraptor         Enable the Velociraptor hunting console on siem +
                         clients on winserver/win11 (not mutually exclusive
                         with -Siem - additive alongside any SIEM stack)
+  -Debug                Sets VAGRANT_LOG=debug before running vagrant -
+                        verbose internal Vagrant/provisioner output, useful
+                        when a provisioner fails and the plain log isn't
+                        enough. This is PowerShell's own built-in common
+                        parameter (comes free from CmdletBinding, not
+                        declared here) - applies to every action below,
+                        not just bringing the lab up.
   -Destroy              Run `vagrant destroy -f` instead of `vagrant up`
                         (ignores -Siem/-Guacamole/-Velociraptor, which only
                         matter when bringing the lab up)
@@ -106,6 +114,12 @@ Remove-Item Env:ENABLE_WAZUH           -ErrorAction SilentlyContinue
 Remove-Item Env:ENABLE_GUACAMOLE       -ErrorAction SilentlyContinue
 Remove-Item Env:ENABLE_VELOCIRAPTOR    -ErrorAction SilentlyContinue
 Remove-Item Env:VAGRANT_DEFAULT_PROVIDER -ErrorAction SilentlyContinue
+Remove-Item Env:VAGRANT_LOG            -ErrorAction SilentlyContinue
+
+# -Debug is PowerShell's own common parameter (free from CmdletBinding) -
+# declaring our own [switch]$Debug would collide with it, so it's read via
+# $PSBoundParameters instead.
+if ($PSBoundParameters.ContainsKey('Debug')) { $env:VAGRANT_LOG = "debug" }
 
 if ($Destroy) {
   Write-Host "Running: vagrant destroy -f $($VagrantArgs -join ' ')"
@@ -168,6 +182,7 @@ if ($env:ENABLE_WAZUH -eq "true")        { $summary += "ENABLE_WAZUH=true" }
 if ($env:ENABLE_GUACAMOLE -eq "true")    { $summary += "ENABLE_GUACAMOLE=true" }
 if ($env:ENABLE_VELOCIRAPTOR -eq "true") { $summary += "ENABLE_VELOCIRAPTOR=true" }
 if ($env:VAGRANT_DEFAULT_PROVIDER)       { $summary += "VAGRANT_DEFAULT_PROVIDER=$($env:VAGRANT_DEFAULT_PROVIDER)" }
+if ($env:VAGRANT_LOG)                    { $summary += "VAGRANT_LOG=$($env:VAGRANT_LOG)" }
 
 Write-Host "Running: $($summary -join ' ') vagrant up $($VagrantArgs -join ' ')"
 vagrant up @VagrantArgs
