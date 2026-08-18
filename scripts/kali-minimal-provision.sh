@@ -31,6 +31,21 @@ apt-get autoremove --purge -y
 apt-get clean
 ok "Autoremove + clean complete"
 
+# autoremove drags openssh-server out with the desktop metapackages if it was
+# ever pulled in as a dependency rather than explicitly installed - without
+# it back, this VM is unreachable by both `vagrant ssh` and the private
+# network (192.168.56.100), the only ways in since it runs headless.
+log "Confirming openssh-server is still present..."
+if dpkg -s openssh-server &> /dev/null; then
+  ok "openssh-server present"
+else
+  log "openssh-server missing - reinstalling"
+  apt-get install -y openssh-server
+  ok "openssh-server reinstalled"
+fi
+systemctl enable --now ssh
+ok "ssh service enabled and running"
+
 log "Confirming kali-linux-core is still present..."
 if dpkg -s kali-linux-core &> /dev/null; then
   ok "kali-linux-core present"
