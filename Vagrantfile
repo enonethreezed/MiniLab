@@ -87,17 +87,18 @@ Vagrant.configure("2") do |config|
     end
 
     # Optional Guacamole (HTML5 RDP/SSH gateway) - lets you reach winserver/
-    # win11 RDP sessions and siem's own SSH from a browser, no local RDP/SSH
-    # client needed. Off by default (extra RAM/CPU, another moving part);
-    # opt in with ENABLE_GUACAMOLE=true. guacamole-server isn't packaged for
-    # Debian at all (pulled from Debian entirely in 2024) - Docker Compose
-    # with the official images is the actual supported install path.
+    # win11 RDP sessions, siem's own SSH, and kali's SSH (if ENABLE_KALI=true)
+    # from a browser, no local RDP/SSH client needed. Off by default (extra
+    # RAM/CPU, another moving part); opt in with ENABLE_GUACAMOLE=true.
+    # guacamole-server isn't packaged for Debian at all (pulled from Debian
+    # entirely in 2024) - Docker Compose with the official images is the
+    # actual supported install path.
     if ENV["ENABLE_GUACAMOLE"] == "true"
       siem.vm.provision "shell", name: "docker-setup", path: "scripts/docker-setup.sh"
 
       siem.vm.provision "shell", name: "guacamole-setup",
         path: "scripts/guacamole-setup.sh",
-        args: [WSRV_IP, WIN11_IP, DOMAIN_NAME.split(".")[0].upcase]
+        args: [WSRV_IP, WIN11_IP, DOMAIN_NAME.split(".")[0].upcase, KALI_IP]
     end
 
     # Optional Velociraptor (live triage / VQL hunting console) - additive
@@ -278,17 +279,6 @@ Vagrant.configure("2") do |config|
         vb.name   = "SOC-Kali"
         vb.gui    = false
         vb.memory = "2048"
-      end
-
-      # Optional minimal strip-down (ENABLE_KALI_MINIMAL=true) - kalilinux/
-      # rolling is still the same ~10GB desktop box download (no smaller
-      # official Kali box exists), but this purges the desktop environment
-      # and the kali-linux-default tool metapackage down to kali-linux-core
-      # right after boot, since this VM runs headless and doesn't need
-      # either.
-      if ENV["ENABLE_KALI_MINIMAL"] == "true"
-        kali.vm.provision "shell", name: "kali-minimal",
-          path: "scripts/kali-minimal-provision.sh"
       end
     end
   end

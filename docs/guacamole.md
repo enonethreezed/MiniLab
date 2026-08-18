@@ -56,7 +56,7 @@ hardened for that exposure.
 
 ## Connection profiles
 
-Four connections are pre-configured (`scripts/guacamole-setup.sh`,
+Five connections are pre-configured (`scripts/guacamole-setup.sh`,
 single-user `user-mapping.xml`, no DB backend needed for a home lab):
 
 | Connection | Protocol | Target | Account |
@@ -65,6 +65,7 @@ single-user `user-mapping.xml`, no DB backend needed for a home lab):
 | `win11 - Administrator (Domain)` | RDP | 192.168.56.30 | `MINILAB\Administrator` |
 | `win11 - vagrant (Local)` | RDP | 192.168.56.30 | local `vagrant` |
 | `siem - SSH` | SSH | 127.0.0.1 | `vagrant`, via a dedicated keypair generated for Guacamole (not Vagrant's own `insecure_private_key`) |
+| `kali - vagrant (SSH)` | SSH | 192.168.56.100 | local `vagrant`/`vagrant` — present whether or not `ENABLE_KALI=true` was actually used, same as the winserver/win11 entries above; it just won't connect if that VM isn't up |
 
 ## Verify
 

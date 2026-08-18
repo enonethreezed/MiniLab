@@ -12,6 +12,7 @@ EXPECTED_CONNECTIONS=(
   "win11 - Administrator (Domain)"
   "win11 - vagrant (Local)"
   "siem - SSH"
+  "kali - vagrant (SSH)"
 )
 
 PASS=0

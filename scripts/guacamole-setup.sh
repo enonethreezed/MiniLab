@@ -11,6 +11,7 @@ set -euo pipefail
 WSRV_IP="${1:-192.168.56.20}"
 WIN11_IP="${2:-192.168.56.30}"
 DOMAIN_NETBIOS="${3:-MINILAB}"
+KALI_IP="${4:-192.168.56.100}"
 
 LOG_DIR="/vagrant/logs"
 LOG_FILE="${LOG_DIR}/guacamole-setup.log"
@@ -133,6 +134,14 @@ cat > "${GUAC_DIR}/user-mapping.xml" << EOF
             <param name="private-key">${PRIVATE_KEY}</param>
         </connection>
 
+        <connection name="kali - vagrant (SSH)">
+            <protocol>ssh</protocol>
+            <param name="hostname">${KALI_IP}</param>
+            <param name="port">22</param>
+            <param name="username">vagrant</param>
+            <param name="password">vagrant</param>
+        </connection>
+
     </authorize>
 </user-mapping>
 EOF
@@ -142,7 +151,7 @@ EOF
 # as-is. Matches this lab's existing convention for credential files
 # (logs/credentials.txt is also 644 - single-tenant lab VM, not multi-user).
 chmod 644 "${GUAC_DIR}/user-mapping.xml"
-ok "user-mapping.xml written (4 connections)"
+ok "user-mapping.xml written (5 connections)"
 
 {
   echo "# Guacamole Credentials - generated $(date)"
