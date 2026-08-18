@@ -182,27 +182,11 @@ own tooling); it just joins the lab's private network.
 
 ```bash
 ENABLE_KALI=true vagrant up kali
-./install.sh -- kali                 # same thing, via the wrapper
+./install.sh --kali -- kali          # same thing, via the wrapper
 ```
-
-### Minimal variant
 
 `kalilinux/rolling` is a full desktop image (~10 GB after first boot) — no
-smaller official Kali box exists. `--kali-minimal`/`-KaliMinimal` still
-downloads that same box, but purges the desktop environment and the
-`kali-linux-default` tool metapackage right after boot (`scripts/kali-minimal-provision.sh`),
-leaving only `kali-linux-core` — useful when you don't need the full
-toolset and just want a lighter-footprint attacker box:
-
-```bash
-./install.sh --kali-minimal -- kali
-```
-
-```powershell
-.\install.ps1 -KaliMinimal kali
-```
-
-Equivalent to `ENABLE_KALI=true ENABLE_KALI_MINIMAL=true vagrant up kali`.
+smaller official Kali box exists, and no strip-down runs on it.
 
 Access:
 
@@ -338,7 +322,6 @@ MiniLab/
 │   ├── velociraptor-provision.sh        # Velociraptor server on siem (ENABLE_VELOCIRAPTOR=true)
 │   ├── winserver-velociraptor-agent.ps1 # Velociraptor client on WinServer (ENABLE_VELOCIRAPTOR=true)
 │   ├── win11-velociraptor-agent.ps1     # Velociraptor client on Win11 (ENABLE_VELOCIRAPTOR=true)
-│   └── kali-minimal-provision.sh        # Strips Kali to kali-linux-core (ENABLE_KALI_MINIMAL=true)
 ├── docs/                            # This site (GitHub Pages, served from /docs)
 └── tests/
     ├── check-lab.sh                # SIEM health check (bash) - ELK, or delegates to check-splunk.sh/check-wazuh.sh

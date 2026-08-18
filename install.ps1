@@ -4,7 +4,7 @@
 # for an already-created environment, with a fixed VM order.
 #
 # Usage:
-#   .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Velociraptor] [-KaliMinimal] [-Debug] [<vagrant up args>]
+#   .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Velociraptor] [-Kali] [-Debug] [<vagrant up args>]
 #   .\install.ps1 -Destroy [<vagrant destroy args>]
 #   .\install.ps1 -Start|-Stop|-Suspend|-Resume|-Reload
 #   .\install.ps1 -Status
@@ -13,7 +13,7 @@
 #   .\install.ps1                              # ELK (default), no extras
 #   .\install.ps1 -Siem splunk -Guacamole      # Splunk + Guacamole
 #   .\install.ps1 -Velociraptor                # ELK + Velociraptor hunting console
-#   .\install.ps1 -KaliMinimal kali            # stripped-down Kali attacker box only
+#   .\install.ps1 -Kali kali                    # Kali attacker box only
 #   .\install.ps1 -Debug                       # verbose Vagrant/provisioner output (VAGRANT_LOG=debug)
 #   .\install.ps1 -Destroy                     # vagrant destroy -f (all VMs)
 #   .\install.ps1 -Destroy win11                # vagrant destroy -f win11 only
@@ -30,7 +30,7 @@ param(
   [string]$Siem = "",
   [switch]$Guacamole,
   [switch]$Velociraptor,
-  [switch]$KaliMinimal,
+  [switch]$Kali,
   [switch]$Destroy,
   [switch]$Start,
   [switch]$Stop,
@@ -48,7 +48,7 @@ $ErrorActionPreference = "Stop"
 
 function Show-Usage {
   @'
-Usage: .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Velociraptor] [-KaliMinimal] [-Debug] [<vagrant up args>]
+Usage: .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Velociraptor] [-Kali] [-Debug] [<vagrant up args>]
        .\install.ps1 -Destroy [<vagrant destroy args>]
        .\install.ps1 -Start|-Stop|-Suspend|-Resume|-Reload|-Status
 
@@ -58,12 +58,9 @@ Usage: .\install.ps1 [-Siem splunk|wazuh] [-Guacamole] [-Velociraptor] [-KaliMin
   -Velociraptor         Enable the Velociraptor hunting console on siem +
                         clients on winserver/win11 (not mutually exclusive
                         with -Siem - additive alongside any SIEM stack)
-  -KaliMinimal          Bring up the Kali attacker box (implies ENABLE_KALI),
-                        stripped to kali-linux-core after boot - the box
-                        download is still the full kalilinux/rolling image
-                        (no smaller official box exists), but the desktop
-                        environment and default tool metapackage are purged
-                        since this VM runs headless
+  -Kali                 Bring up the Kali attacker box (ENABLE_KALI=true) -
+                        no provisioning script runs on it, bring your own
+                        tooling
   -Debug                Sets VAGRANT_LOG=debug before running vagrant -
                         verbose internal Vagrant/provisioner output, useful
                         when a provisioner fails and the plain log isn't
@@ -115,7 +112,6 @@ Remove-Item Env:ENABLE_WAZUH           -ErrorAction SilentlyContinue
 Remove-Item Env:ENABLE_GUACAMOLE       -ErrorAction SilentlyContinue
 Remove-Item Env:ENABLE_VELOCIRAPTOR    -ErrorAction SilentlyContinue
 Remove-Item Env:ENABLE_KALI            -ErrorAction SilentlyContinue
-Remove-Item Env:ENABLE_KALI_MINIMAL    -ErrorAction SilentlyContinue
 Remove-Item Env:VAGRANT_LOG            -ErrorAction SilentlyContinue
 
 # -Debug is PowerShell's own common parameter (free from CmdletBinding) -
@@ -187,7 +183,7 @@ switch ($Siem) {
 }
 if ($Guacamole)    { $env:ENABLE_GUACAMOLE = "true" }
 if ($Velociraptor) { $env:ENABLE_VELOCIRAPTOR = "true" }
-if ($KaliMinimal)  { $env:ENABLE_KALI = "true"; $env:ENABLE_KALI_MINIMAL = "true" }
+if ($Kali)         { $env:ENABLE_KALI = "true" }
 
 $summary = @()
 if ($env:ENABLE_SPLUNK -eq "true")       { $summary += "ENABLE_SPLUNK=true" }
@@ -195,7 +191,6 @@ if ($env:ENABLE_WAZUH -eq "true")        { $summary += "ENABLE_WAZUH=true" }
 if ($env:ENABLE_GUACAMOLE -eq "true")    { $summary += "ENABLE_GUACAMOLE=true" }
 if ($env:ENABLE_VELOCIRAPTOR -eq "true") { $summary += "ENABLE_VELOCIRAPTOR=true" }
 if ($env:ENABLE_KALI -eq "true")         { $summary += "ENABLE_KALI=true" }
-if ($env:ENABLE_KALI_MINIMAL -eq "true") { $summary += "ENABLE_KALI_MINIMAL=true" }
 if ($env:VAGRANT_LOG)                    { $summary += "VAGRANT_LOG=$($env:VAGRANT_LOG)" }
 
 Write-Host "Running: $($summary -join ' ') vagrant up $($VagrantArgs -join ' ')"
