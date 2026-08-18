@@ -274,6 +274,10 @@ Vagrant.configure("2") do |config|
       kali.vm.hostname = "kali-atk"
 
       kali.vm.network "private_network", ip: KALI_IP
+      # SSH straight from the host, without going through `vagrant ssh` /
+      # its auto-managed forward - localhost-only, same as everything else
+      # in this lab except Guacamole's deliberate exception.
+      kali.vm.network "forwarded_port", guest: 22, host: 32200, host_ip: "127.0.0.1"
 
       kali.vm.provider "virtualbox" do |vb|
         vb.name   = "SOC-Kali"

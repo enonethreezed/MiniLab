@@ -192,11 +192,11 @@ Access:
 
 ```bash
 vagrant ssh kali
+ssh -p 32200 vagrant@localhost   # equivalent, straight from the host
 ```
 
-There's no port forward for it — reach `winserver`/`win11` from inside
-`kali` over the private network (192.168.56.20 / .30), not the other way
-around.
+Reach `winserver`/`win11` from inside `kali` over the private network
+(192.168.56.20 / .30), not the other way around.
 
 ## Fleet and Elastic Defend
 
