@@ -317,25 +317,20 @@ Vagrant.configure("2") do |config|
       end
 
       if Vagrant.has_plugin?("vagrant-vbguest")
-        # vbguest doesn't recognize "kali" as a known Linux flavor and falls
-        # back to its generic installer, which - unlike the Debian/Ubuntu
-        # ones - never installs kernel headers first. Without them the
-        # Guest Additions kernel module build fails every time with "Kernel
-        # headers not found". Install them right before vbguest builds.
-        #
-        # kalilinux/rolling drifts fast: the exact package matching the
-        # box's currently-running kernel (linux-headers-$(uname -r)) is
-        # often already gone from the repo by the time you boot it, since
-        # Kali doesn't keep old-kernel headers around. Fall back to the
-        # amd64 meta-package (whatever's current), and never let this hook
-        # itself fail the whole `vagrant up` - a mismatched/failed module
-        # rebuild is just a non-fatal vbguest warning, same as if this hook
-        # didn't run at all.
-        kali.vbguest.installer_hooks[:before_install] = [
-          "apt-get update -qq && " \
-          "(apt-get install -y linux-headers-$(uname -r) || " \
-          "apt-get install -y linux-headers-amd64 || true)"
-        ]
+        # kalilinux/rolling already ships matching Guest Additions out of the
+        # box: virtualbox-guest-utils/-x11 native packages paired with the
+        # in-tree vboxguest/vboxvideo/vboxsf kernel modules (no build step,
+        # no headers needed - they're compiled into the kernel package
+        # itself). vbguest doesn't recognize "kali" as a known flavor, so it
+        # falls back to its generic installer - which doesn't just fail to
+        # improve on that, it actively breaks it: the generic .run installer
+        # overwrites /usr/bin/VBoxClient and /usr/sbin/VBoxService with
+        # symlinks into its own /opt/VBoxGuestAdditions-*, whose bundled
+        # kernel modules then fail to build against Kali's fast-moving
+        # kernel (missing MODULE_IMPORT_NS for newer symbols) - leaving both
+        # sets of binaries broken and /dev/vboxguest missing entirely.
+        # Simplest fix: don't run it here at all, same as siem.
+        kali.vbguest.auto_update = false
       end
     end
   end
