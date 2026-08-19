@@ -177,8 +177,9 @@ xfreerdp /v:localhost:13389 /u:vagrant /p:vagrant /dynamic-resolution
 
 A Kali Linux VM (`kalilinux/rolling`, 192.168.56.100, 4 GB RAM, headless) for
 driving traffic/attacks against `winserver`/`win11` to generate detections.
-Off by default — no provisioning script runs on it by default (bring your
-own tooling); it just joins the lab's private network.
+Off by default — bring your own attack tooling; the only thing provisioned
+for you is xrdp (`scripts/kali-xrdp-setup.sh`), for graphical access to the
+desktop it already ships with.
 
 ```bash
 ENABLE_KALI=true vagrant up kali
@@ -194,6 +195,22 @@ Access:
 vagrant ssh kali
 ssh -p 32200 vagrant@localhost   # equivalent, straight from the host
 ```
+
+For graphical tools, RDP into the existing XFCE desktop instead of opening
+the VirtualBox GUI window — FreeRDP-based clients (`xfreerdp
+/dynamic-resolution`, Remmina, ...) negotiate dynamic resize properly, which
+VirtualBox's own guest-display integration doesn't do reliably headless:
+
+```bash
+xfreerdp /v:192.168.56.100 /u:vagrant /p:vagrant /dynamic-resolution
+# or localhost:33389 from the host, same as vagrant ssh vs. -p 32200 above
+```
+
+{: .warning }
+`xfce4-session` allows only one session per user. If you open the
+VirtualBox GUI window for `kali` (logging `vagrant` into the console), RDP
+sessions as `vagrant` will fail to start a desktop until that console
+session is closed. Use one access method at a time.
 
 Reach `winserver`/`win11` from inside `kali` over the private network
 (192.168.56.20 / .30), not the other way around.
@@ -322,6 +339,7 @@ MiniLab/
 │   ├── velociraptor-provision.sh        # Velociraptor server on siem (ENABLE_VELOCIRAPTOR=true)
 │   ├── winserver-velociraptor-agent.ps1 # Velociraptor client on WinServer (ENABLE_VELOCIRAPTOR=true)
 │   ├── win11-velociraptor-agent.ps1     # Velociraptor client on Win11 (ENABLE_VELOCIRAPTOR=true)
+│   ├── kali-xrdp-setup.sh               # xrdp for graphical access on Kali (ENABLE_KALI=true)
 ├── docs/                            # This site (GitHub Pages, served from /docs)
 └── tests/
     ├── check-lab.sh                # SIEM health check (bash) - ELK, or delegates to check-splunk.sh/check-wazuh.sh

@@ -309,12 +309,18 @@ Vagrant.configure("2") do |config|
       # its auto-managed forward - localhost-only, same as everything else
       # in this lab except Guacamole's deliberate exception.
       kali.vm.network "forwarded_port", guest: 22, host: 32200, host_ip: "127.0.0.1"
+      # xrdp (scripts/kali-xrdp-setup.sh) - RDP into the existing XFCE
+      # desktop for graphical tools, same lab-wide localhost-only default.
+      kali.vm.network "forwarded_port", guest: 3389, host: 33389, host_ip: "127.0.0.1"
 
       kali.vm.provider "virtualbox" do |vb|
         vb.name   = "SOC-Kali"
         vb.gui    = false
         vb.memory = "4096"
       end
+
+      kali.vm.provision "shell", name: "kali-xrdp-setup",
+        path: "scripts/kali-xrdp-setup.sh"
 
       if Vagrant.has_plugin?("vagrant-vbguest")
         # kalilinux/rolling already ships matching Guest Additions out of the
