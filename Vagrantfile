@@ -26,6 +26,18 @@ Vagrant.configure("2") do |config|
   # shared folders or kernel-module build failures on boxes like kalilinux/
   # rolling that ship their own, often older/newer, Additions.
   if Vagrant.has_plugin?("vagrant-vbguest")
+    # vagrant-vbguest 0.32.0 (latest on RubyGems, unpatched upstream) calls
+    # File.exists?, an alias Ruby removed in 3.2+ - Vagrant's own bundled
+    # Ruby is newer than that, so every vbguest run crashes with
+    # NoMethodError without this shim restoring it.
+    unless File.respond_to?(:exists?)
+      class File
+        def self.exists?(*args)
+          exist?(*args)
+        end
+      end
+    end
+
     config.vbguest.auto_update = true
   else
     warn "NOTE: vagrant-vbguest plugin not installed - Guest Additions won't " \
@@ -302,6 +314,18 @@ Vagrant.configure("2") do |config|
         vb.name   = "SOC-Kali"
         vb.gui    = false
         vb.memory = "4096"
+      end
+
+      if Vagrant.has_plugin?("vagrant-vbguest")
+        # vbguest doesn't recognize "kali" as a known Linux flavor and falls
+        # back to its generic installer, which - unlike the Debian/Ubuntu
+        # ones - never installs kernel headers first. Without them the
+        # Guest Additions kernel module build fails every time with "Kernel
+        # headers not found". Install them right before vbguest builds.
+        kali.vbguest.installer_hooks[:before_install] = [
+          "apt-get update -qq",
+          "apt-get install -y linux-headers-$(uname -r)"
+        ]
       end
     end
   end
