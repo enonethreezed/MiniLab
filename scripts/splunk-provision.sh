@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Splunk Enterprise on Debian Bookworm - SIEM alternative to ELK (ENABLE_SPLUNK=1)
+# Splunk Enterprise on Debian Trixie - SIEM alternative to ELK (ENABLE_SPLUNK=1)
 # Mutually exclusive with elk-provision.sh - only one of the two ever runs.
 set -euo pipefail
 

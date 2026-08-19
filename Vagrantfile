@@ -34,12 +34,15 @@ Vagrant.configure("2") do |config|
   end
 
   # ──────────────────────────────────────────────────────────────────────────
-  # 1. SIEM  (Debian Bookworm) - ELK by default, Splunk with ENABLE_SPLUNK=1,
+  # 1. SIEM  (Debian Trixie) - ELK by default, Splunk with ENABLE_SPLUNK=1,
   #    Wazuh with ENABLE_WAZUH=1. Mutually exclusive: only one SIEM stack is
   #    provisioned per run.
   # ──────────────────────────────────────────────────────────────────────────
   config.vm.define "siem" do |siem|
-    siem.vm.box      = "debian/bookworm64"
+    # bento/debian-13, not the official debian/trixie64 - the debian org box
+    # only publishes a libvirt artifact for trixie64 right now, no
+    # virtualbox one, which is what this whole lab runs on.
+    siem.vm.box      = "bento/debian-13"
     siem.vm.hostname = "siem"
     # No shared folders in play here and no kernel-module builds like on
     # kalilinux/rolling - skip the Guest Additions auto-update on this one,

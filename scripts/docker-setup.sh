@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Docker Engine + Compose on elk (Debian Bookworm)
+# Docker Engine + Compose on elk (Debian Trixie)
 # Generic infra step - not Guacamole-specific, so future services that also
 # need Docker don't have to duplicate this.
 set -euo pipefail

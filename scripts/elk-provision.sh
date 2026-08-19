@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ELK Stack 8.x + Fleet Server on Debian Bookworm
+# ELK Stack 8.x + Fleet Server on Debian Trixie
 # Pipeline: Elastic Agent (Windows) -> Elasticsearch:9200 <- Kibana:5601
 #           Fleet Server: http://ELK_IP:8220
 set -euo pipefail

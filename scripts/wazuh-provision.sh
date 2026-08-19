@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wazuh all-in-one (manager + indexer + dashboard) on Debian Bookworm - SIEM
+# Wazuh all-in-one (manager + indexer + dashboard) on Debian Trixie - SIEM
 # alternative to ELK/Splunk (ENABLE_WAZUH=1). Mutually exclusive with
 # elk-provision.sh/splunk-provision.sh - only one of the three ever runs.
 set -euo pipefail
