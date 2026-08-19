@@ -55,6 +55,18 @@ New-NetFirewallRule -DisplayName "Lab-ICMP-In" `
   -Direction Inbound -Protocol ICMPv4 -Action Allow `
   -RemoteAddress "192.168.56.0/24" -ErrorAction SilentlyContinue | Out-Null
 
+# Network Discovery + File/Printer Sharing - off by default on Windows' own
+# Public profile, which is what a fresh, not-yet-domain-joined adapter gets
+# classified as. Enabled across every profile (Public/Private/Domain) so it
+# works both now and after domain-join (scripts/domain-join.ps1, later in
+# the provisioning order) switches the active profile to DomainAuthenticated.
+Set-NetFirewallRule -DisplayGroup "Network Discovery" -Enabled True -Profile Any
+Set-NetFirewallRule -DisplayGroup "File and Printer Sharing" -Enabled True -Profile Any
+Set-Service -Name "fdPHost" -StartupType Automatic
+Set-Service -Name "FDResPub" -StartupType Automatic
+Start-Service -Name "fdPHost", "FDResPub" -ErrorAction SilentlyContinue
+ok "Network Discovery + File/Printer Sharing enabled (all profiles)"
+
 # -- 3. PowerShell Script Block + Module logging -------------------------------
 # Off by default in Windows - without this, offensive PowerShell (encoded/
 # obfuscated/in-memory execution - most real TTPs) leaves no trace beyond the
