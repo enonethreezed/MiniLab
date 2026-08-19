@@ -41,6 +41,10 @@ Vagrant.configure("2") do |config|
   config.vm.define "siem" do |siem|
     siem.vm.box      = "debian/bookworm64"
     siem.vm.hostname = "siem"
+    # No shared folders in play here and no kernel-module builds like on
+    # kalilinux/rolling - skip the Guest Additions auto-update on this one,
+    # not worth the extra boot time on an always-on service box.
+    siem.vbguest.auto_update = false
 
     siem.vm.network "private_network", ip: SIEM_IP
     # Kibana accesible desde el host en http://localhost:5601
