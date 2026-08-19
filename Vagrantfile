@@ -21,6 +21,18 @@ end
 
 Vagrant.configure("2") do |config|
 
+  # Keep Guest Additions in every VM matched to the host's VirtualBox version
+  # (vagrant plugin install vagrant-vbguest) - mismatches show up as broken
+  # shared folders or kernel-module build failures on boxes like kalilinux/
+  # rolling that ship their own, often older/newer, Additions.
+  if Vagrant.has_plugin?("vagrant-vbguest")
+    config.vbguest.auto_update = true
+  else
+    warn "NOTE: vagrant-vbguest plugin not installed - Guest Additions won't " \
+         "auto-update to match this host's VirtualBox version. Install with: " \
+         "vagrant plugin install vagrant-vbguest"
+  end
+
   # ──────────────────────────────────────────────────────────────────────────
   # 1. SIEM  (Debian Bookworm) - ELK by default, Splunk with ENABLE_SPLUNK=1,
   #    Wazuh with ENABLE_WAZUH=1. Mutually exclusive: only one SIEM stack is

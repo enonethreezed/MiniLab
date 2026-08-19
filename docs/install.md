@@ -36,6 +36,11 @@ https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
   sudo tee /etc/apt/sources.list.d/hashicorp.list
 sudo apt update
 sudo apt install -y vagrant
+
+# vagrant-vbguest — keeps Guest Additions in every VM matched to the host's
+# VirtualBox version; mismatches show up as broken shared folders or
+# kernel-module build failures on boxes like kalilinux/rolling
+vagrant plugin install vagrant-vbguest
 ```
 
 WinRM support (used to provision the Windows VMs) is bundled into Vagrant
