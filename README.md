@@ -15,7 +15,7 @@ A three-VM defensive security lab running on VirtualBox, built for practising de
 | `siem` | debian/bookworm64 | 192.168.56.10 | 12 GB | SIEM — ELK 8.x + Fleet Server by default, or Splunk Enterprise / Wazuh |
 | `winserver` | gusztavvargadr/windows-server-2022-standard | 192.168.56.20 | 4 GB | Windows Server endpoint + `minilab.local` Domain Controller |
 | `win11` | gusztavvargadr/windows-11 | 192.168.56.30 | 4 GB | Windows 11 workstation, joined to `minilab.local` |
-| `kali` | kalilinux/rolling | 192.168.56.100 | 2 GB | Attacker box, `ENABLE_KALI=true` |
+| `kali` | kalilinux/rolling | 192.168.56.100 | 4 GB | Attacker box, `ENABLE_KALI=true` |
 
 ## Quick start
 

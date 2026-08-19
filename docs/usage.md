@@ -175,7 +175,7 @@ xfreerdp /v:localhost:13389 /u:vagrant /p:vagrant /dynamic-resolution
 
 ## Optional: Kali attacker box
 
-A Kali Linux VM (`kalilinux/rolling`, 192.168.56.100, 2 GB RAM, headless) for
+A Kali Linux VM (`kalilinux/rolling`, 192.168.56.100, 4 GB RAM, headless) for
 driving traffic/attacks against `winserver`/`win11` to generate detections.
 Off by default — no provisioning script runs on it by default (bring your
 own tooling); it just joins the lab's private network.
