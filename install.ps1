@@ -131,7 +131,12 @@ if ($PSBoundParameters.ContainsKey('Debug')) {
 }
 
 if ($Destroy) {
-  Write-Host "Running: vagrant destroy -f $($VagrantArgs -join ' ')"
+  # ENABLE_KALI=true unconditionally: kali only exists in the Vagrantfile at
+  # all when that's set, so without it a bare `vagrant destroy -f` can't see
+  # the machine to tear it down, even if it was created earlier with -Kali.
+  # Harmless no-op if kali was never created.
+  $env:ENABLE_KALI = "true"
+  Write-Host "Running: env ENABLE_KALI=true vagrant destroy -f $($VagrantArgs -join ' ')"
   vagrant destroy -f @VagrantArgs
   exit $LASTEXITCODE
 }

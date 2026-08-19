@@ -322,9 +322,19 @@ Vagrant.configure("2") do |config|
         # ones - never installs kernel headers first. Without them the
         # Guest Additions kernel module build fails every time with "Kernel
         # headers not found". Install them right before vbguest builds.
+        #
+        # kalilinux/rolling drifts fast: the exact package matching the
+        # box's currently-running kernel (linux-headers-$(uname -r)) is
+        # often already gone from the repo by the time you boot it, since
+        # Kali doesn't keep old-kernel headers around. Fall back to the
+        # amd64 meta-package (whatever's current), and never let this hook
+        # itself fail the whole `vagrant up` - a mismatched/failed module
+        # rebuild is just a non-fatal vbguest warning, same as if this hook
+        # didn't run at all.
         kali.vbguest.installer_hooks[:before_install] = [
-          "apt-get update -qq",
-          "apt-get install -y linux-headers-$(uname -r)"
+          "apt-get update -qq && " \
+          "(apt-get install -y linux-headers-$(uname -r) || " \
+          "apt-get install -y linux-headers-amd64 || true)"
         ]
       end
     end
