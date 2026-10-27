@@ -42,7 +42,7 @@ graph TB
     W11 -->|"Elastic Agent / Splunk UF / Wazuh agent"| SIEM
     W11 -->|"domain join"| WS
 
-    HOST["Host browser"] -->|"localhost:5601 / :8000"| SIEM
+    HOST["Host browser"] -->|"localhost:5601 / :8000 / :8280"| SIEM
 ```
 
 ## Optional features

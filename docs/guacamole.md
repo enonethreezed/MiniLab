@@ -46,13 +46,8 @@ ENABLE_GUACAMOLE=true vagrant provision siem --provision-with docker-setup,guaca
 Web UI: **http://localhost:8280/guacamole** — credentials in
 `logs/guacamole-credentials.txt` (`admin` / `vagrant`).
 
-{: .warning }
-Unlike every other service in this lab, this port forward is bound to
-`0.0.0.0` (not `127.0.0.1`) — deliberately reachable from other devices on
-your network (e.g. a phone/tablet), not just this machine:
-`http://<host-LAN-IP>:8280/guacamole`. Keep that in mind on untrusted
-networks — the `admin`/`vagrant` login is a lab-simple credential, not
-hardened for that exposure.
+The port forward is bound to `127.0.0.1`, so Guacamole is only reachable
+from the host running the lab at `http://localhost:8280/guacamole`.
 
 ## Connection profiles
 

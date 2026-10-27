@@ -73,11 +73,9 @@ Vagrant.configure("2") do |config|
     # Wazuh dashboard + manager API (ENABLE_WAZUH=1)
     siem.vm.network "forwarded_port", guest: 443, host: 4430, host_ip: "127.0.0.1"
     siem.vm.network "forwarded_port", guest: 55000, host: 55000, host_ip: "127.0.0.1"
-    # Guacamole web UI (optional, ENABLE_GUACAMOLE=true) - unlike everything
-    # else in this lab, bound to 0.0.0.0 on purpose: it's meant to be reachable
-    # from other devices on your network (e.g. a phone/tablet), not just this
-    # machine. See docs/guacamole.md for the security caveat that comes with it.
-    siem.vm.network "forwarded_port", guest: 8080, host: 8280, host_ip: "0.0.0.0"
+    # Guacamole web UI (optional, ENABLE_GUACAMOLE=true) - host-only, like
+    # every other forwarded service in the lab.
+    siem.vm.network "forwarded_port", guest: 8080, host: 8280, host_ip: "127.0.0.1"
     # Velociraptor (optional, ENABLE_VELOCIRAPTOR=true) - GUI + client-server
     # frontend. Frontend is 8001, not Velociraptor's 8000 default, since that
     # clashes with Splunk Web on this same VM (ENABLE_SPLUNK=1).
