@@ -6,7 +6,7 @@ $ProgressPreference    = "SilentlyContinue"
 
 $ToolsDir      = "C:\Tools"
 $SysmonDir     = "$ToolsDir\sysmon"
-$SysmonCfgUrl  = "https://raw.githubusercontent.com/olafhartong/sysmon-modular/master/sysmonconfig.xml"
+$SysmonCfgUrl  = "https://github.com/olafhartong/sysmon-modular/releases/latest/download/sysmonconfig.xml"
 $SysmonUrl     = "https://download.sysinternals.com/files/Sysmon.zip"
 
 # -- Logging -------------------------------------------------------------------
