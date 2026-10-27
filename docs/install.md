@@ -37,14 +37,10 @@ https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
 sudo apt update
 sudo apt install -y vagrant
 
-# vagrant-vbguest — keeps Guest Additions in every VM matched to the host's
-# VirtualBox version; mismatches show up as broken shared folders or
-# kernel-module build failures on boxes like kalilinux/rolling
-vagrant plugin install vagrant-vbguest
 ```
 
 WinRM support (used to provision the Windows VMs) is bundled into Vagrant
-core — no extra plugin needed.
+core. The lab does not require any Vagrant plugins.
 
 Confirm hardware virtualization is available (VT-x/AMD-V — enable in
 BIOS/UEFI if the count is 0):

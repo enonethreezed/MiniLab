@@ -21,30 +21,6 @@ end
 
 Vagrant.configure("2") do |config|
 
-  # Keep Guest Additions in every VM matched to the host's VirtualBox version
-  # (vagrant plugin install vagrant-vbguest) - mismatches show up as broken
-  # shared folders or kernel-module build failures on boxes like kalilinux/
-  # rolling that ship their own, often older/newer, Additions.
-  if Vagrant.has_plugin?("vagrant-vbguest")
-    # vagrant-vbguest 0.32.0 (latest on RubyGems, unpatched upstream) calls
-    # File.exists?, an alias Ruby removed in 3.2+ - Vagrant's own bundled
-    # Ruby is newer than that, so every vbguest run crashes with
-    # NoMethodError without this shim restoring it.
-    unless File.respond_to?(:exists?)
-      class File
-        def self.exists?(*args)
-          exist?(*args)
-        end
-      end
-    end
-
-    config.vbguest.auto_update = true
-  else
-    warn "NOTE: vagrant-vbguest plugin not installed - Guest Additions won't " \
-         "auto-update to match this host's VirtualBox version. Install with: " \
-         "vagrant plugin install vagrant-vbguest"
-  end
-
   # ──────────────────────────────────────────────────────────────────────────
   # 1. SIEM  (Debian Trixie) - ELK by default, Splunk with ENABLE_SPLUNK=1,
   #    Wazuh with ENABLE_WAZUH=1. Mutually exclusive: only one SIEM stack is
@@ -56,11 +32,6 @@ Vagrant.configure("2") do |config|
     # virtualbox one, which is what this whole lab runs on.
     siem.vm.box      = "bento/debian-13"
     siem.vm.hostname = "siem"
-    # No shared folders in play here and no kernel-module builds like on
-    # kalilinux/rolling - skip the Guest Additions auto-update on this one,
-    # not worth the extra boot time on an always-on service box.
-    siem.vbguest.auto_update = false
-
     siem.vm.network "private_network", ip: SIEM_IP
     # Kibana accesible desde el host en http://localhost:5601
     siem.vm.network "forwarded_port", guest: 5601, host: 5601, host_ip: "127.0.0.1"
@@ -320,22 +291,6 @@ Vagrant.configure("2") do |config|
       kali.vm.provision "shell", name: "kali-xrdp-setup",
         path: "scripts/kali-xrdp-setup.sh"
 
-      if Vagrant.has_plugin?("vagrant-vbguest")
-        # kalilinux/rolling already ships matching Guest Additions out of the
-        # box: virtualbox-guest-utils/-x11 native packages paired with the
-        # in-tree vboxguest/vboxvideo/vboxsf kernel modules (no build step,
-        # no headers needed - they're compiled into the kernel package
-        # itself). vbguest doesn't recognize "kali" as a known flavor, so it
-        # falls back to its generic installer - which doesn't just fail to
-        # improve on that, it actively breaks it: the generic .run installer
-        # overwrites /usr/bin/VBoxClient and /usr/sbin/VBoxService with
-        # symlinks into its own /opt/VBoxGuestAdditions-*, whose bundled
-        # kernel modules then fail to build against Kali's fast-moving
-        # kernel (missing MODULE_IMPORT_NS for newer symbols) - leaving both
-        # sets of binaries broken and /dev/vboxguest missing entirely.
-        # Simplest fix: don't run it here at all, same as siem.
-        kali.vbguest.auto_update = false
-      end
     end
   end
 
